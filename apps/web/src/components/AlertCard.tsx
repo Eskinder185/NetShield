@@ -6,15 +6,16 @@ import { SEVERITY } from '../lib/plain';
  * The one shape every meaningful issue uses:
  * What happened → Why it matters → What I can do → How we'll check it worked.
  */
-export function AlertCard({ severity, title, what, why, todo, verify, evidence, tech, actions, status }: {
-  severity: keyof typeof SEVERITY; title: string; what: ReactNode; why?: ReactNode; todo: ReactNode; verify?: ReactNode;
+export function AlertCard({ level = 3, severity, title, what, why, todo, verify, evidence, tech, actions, status }: {
+  level?: 2 | 3; severity: keyof typeof SEVERITY; title: string; what: ReactNode; why?: ReactNode; todo: ReactNode; verify?: ReactNode;
   evidence?: ReactNode; tech?: ReactNode; actions?: ReactNode; status?: ReactNode;
 }) {
   const sev = SEVERITY[severity];
+  const H = (level === 2 ? 'h2' : 'h3') as 'h2' | 'h3';
   return (
     <article className="card alert-card" aria-label={title}>
       <div className="row-between">
-        <h3 style={{ margin: 0 }}>{title}</h3>
+        <H className="card-title" style={{ margin: 0 }}>{title}</H>
         <div className="row"><Pill tone={sev.tone}>{sev.label}</Pill>{status}</div>
       </div>
       <div className="alert-flow">

@@ -7,4 +7,4 @@ Nothing here blocks local development or the tests. Everything is optional unles
 3. **Install JDK 21 (optional).** The code compiles to Java 17 because only JDK 17 was installed; the Dockerfiles use 21. See `DECISIONS.md` D-02.
 4. **Choose real network scope for any live agent run.** Defaults probe public services (1.1.1.1, 9.9.9.9, example.com) on your behalf only when *you* start the agent. Pass `--gateway` yourself; device inventory requires both the in-app consent and `--approved-cidrs`.
 5. **Provide when ready (not needed now):** a domain/hosting decision, an email provider (verification, reset, alerts), a payment provider (billing), legal review of the draft policies, an independent security review, and a security-contact address.
-6. **Visual QA in a real browser.** This session had no screenshot tooling configured; layout/contrast were checked with automated tests and CSS review only. See `BUILD_LOG.md`.
+6. **Human review.** Automated browser QA is done (see `DESIGN_SYSTEM.md`), but please click through the app yourself and try it with a nontechnical person; a screen-reader pass has not been done.

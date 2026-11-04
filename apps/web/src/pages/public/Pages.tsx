@@ -108,7 +108,7 @@ export function Pricing() {
           <ul className="check-list" style={{ marginTop: 16 }}>{f.map((x) => <li key={x}><CheckCircle2 size={16} aria-hidden="true" /><span>{x}</span></li>)}</ul>
           {i === 0 ? <LinkButton to="/register" block>Create free account</LinkButton> : <Button block disabled variant="secondary">Not available yet</Button>}</div>))}</div>
       <h2>What works today</h2>
-      <div className="table-wrap"><table><thead><tr><th>Feature</th><th>Needs</th><th>Status</th></tr></thead><tbody>{AVAILABILITY.map((a) => <tr key={a.feature}><td>{a.feature}</td><td>{a.level}</td><td><Avail s={a.status} /></td></tr>)}</tbody></table></div>
+      <div className="table-wrap" tabIndex={0} role="region" aria-label="Table (scrolls sideways on small screens)"><table><thead><tr><th>Feature</th><th>Needs</th><th>Status</th></tr></thead><tbody>{AVAILABILITY.map((a) => <tr key={a.feature}><td>{a.feature}</td><td>{a.level}</td><td><Avail s={a.status} /></td></tr>)}</tbody></table></div>
     </div></section>
   </>);
 }
@@ -164,7 +164,7 @@ cd apps/web && npm install && npm run dev      # http://127.0.0.1:5173`}</code><
     <h2>Troubleshooting</h2>
     <ul><li><strong>Sensor stays &ldquo;Waiting to connect&rdquo;:</strong> check the token was pasted in full, the API address is reachable, and the token hasn&apos;t expired (7 days to first connect).</li><li><strong>&ldquo;Not enough information&rdquo;:</strong> leave the sensor running for a few minutes.</li><li><strong>No devices listed:</strong> device checking must be turned on in Settings, and the sensor started with <code>--device-inventory --approved-cidrs …</code>.</li></ul>
     <h2>What works today</h2>
-    <div className="table-wrap"><table><thead><tr><th>Feature</th><th>Needs</th><th>Status</th></tr></thead><tbody>{AVAILABILITY.map((a) => <tr key={a.feature}><td>{a.feature}</td><td>{a.level}</td><td>{a.status}</td></tr>)}</tbody></table></div>
+    <div className="table-wrap" tabIndex={0} role="region" aria-label="Table (scrolls sideways on small screens)"><table><thead><tr><th>Feature</th><th>Needs</th><th>Status</th></tr></thead><tbody>{AVAILABILITY.map((a) => <tr key={a.feature}><td>{a.feature}</td><td>{a.level}</td><td>{a.status}</td></tr>)}</tbody></table></div>
   </div></section>
 </>);
 

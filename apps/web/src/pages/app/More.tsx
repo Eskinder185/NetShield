@@ -52,7 +52,7 @@ export function PrivacyVpn() {
       <div><h1 className="page-title">Privacy &amp; VPN</h1><p className="muted">Exactly what NetShield collects, how long it keeps it, and what a VPN does and doesn&apos;t do.</p></div>
       <section className="card" aria-labelledby="coll-h">
         <h2 id="coll-h" style={{ fontSize: '1.3rem' }}>What&apos;s collected</h2>
-        <div className="table-wrap"><table>
+        <div className="table-wrap" tabIndex={0} role="region" aria-label="Table (scrolls sideways on small screens)"><table>
           <thead><tr><th>What</th><th>Why</th><th>When</th></tr></thead>
           <tbody>
             <tr><td>Router, website-lookup and website response times</td><td>To work out why your internet is slow</td><td>Always, once a sensor is running. Kept {ws.settings.retentionDays} days.</td></tr>
@@ -185,7 +185,7 @@ export function Lab() {
         </div>
       )}
       {tab === 'adapt' && (
-        <div className="table-wrap"><table><thead><tr><th>Integration</th><th>Status</th><th>What it needs</th></tr></thead><tbody>
+        <div className="table-wrap" tabIndex={0} role="region" aria-label="Table (scrolls sideways on small screens)"><table><thead><tr><th>Integration</th><th>Status</th><th>What it needs</th></tr></thead><tbody>
           {[['OPNsense (read-only)', 'An isolated lab firewall and an API key you create'], ['Proxmox lab view', 'A lab host and read-only API token'], ['FRRouting', 'A lab router with vtysh access'], ['Wazuh / Suricata alerts', 'Your own Wazuh/Suricata deployment'], ['Optional AI summaries', 'A provider you choose, with your own key']].map(([n, r]) => (
             <tr key={n}><td>{n}</td><td><Pill tone="neutral">Not configured</Pill></td><td>{r}</td></tr>))}</tbody></table></div>
       )}

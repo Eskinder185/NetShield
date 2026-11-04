@@ -52,15 +52,15 @@ export function AppLayout() {
           ))}
         </nav>
         <div style={{ marginTop: 'auto' }} className="faint">
-          {demo ? <Link to="/register">Create a real account →</Link> : <>Signed in as<br /><strong>{user?.displayName}</strong></>}
+          {demo ? <Link className="side-sub" to="/register">Create a real account →</Link> : <>Signed in as<br /><strong>{user?.displayName}</strong></>}
         </div>
       </aside>
       <div className="app-main">
         <header className="app-top no-print">
           <div className="row">
             <span className="mobile-top-menu"><Link to={demo ? '/' : '/app'} aria-label="NetShield"><Logo size={26} /></Link></span>
-            <span className="muted" style={{ fontWeight: 600 }}>{ws.siteName}</span>
-            {demo ? <Pill tone="demo">Demo · synthetic data</Pill> : <Pill tone="info" icon={Gauge}>Live workspace</Pill>}
+            <span className="site-name">{ws.siteName}</span>
+            {demo ? <Pill tone="demo">Demo data</Pill> : <Pill tone="info" icon={Gauge}>Live workspace</Pill>}
           </div>
           <div className="row">
             <ThemeToggle />

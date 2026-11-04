@@ -46,8 +46,14 @@ cd services/agent && mvn -B test     # 9 tests
 cd apps/web       && npm ci && npm run lint && npm run typecheck && npm test && npm run build   # 43 tests
 ```
 
+## Visual & accessibility QA
+```bash
+cd apps/web && npm run build && npx vite preview --port 4173 &   # then:
+node qa/audit.mjs ./qa-out      # screenshots + axe (incl. contrast) at phone/tablet/desktop, dark+light
+```
+
 ## Docs
-[Architecture](docs/ARCHITECTURE.md) · [API](docs/API.md) · [Threat model](docs/THREAT_MODEL.md) · [Privacy model](docs/PRIVACY_MODEL.md) · [Decisions](docs/DECISIONS.md) · [Build log](docs/BUILD_LOG.md) · [Actions needed from you](docs/USER_ACTIONS_REQUIRED.md)
+[Design system](docs/DESIGN_SYSTEM.md) · [Architecture](docs/ARCHITECTURE.md) · [API](docs/API.md) · [Threat model](docs/THREAT_MODEL.md) · [Privacy model](docs/PRIVACY_MODEL.md) · [Decisions](docs/DECISIONS.md) · [Build log](docs/BUILD_LOG.md) · [Actions needed from you](docs/USER_ACTIONS_REQUIRED.md)
 
 ## Backup / restore (PostgreSQL)
 `docker compose exec db pg_dump -U netshield netshield > backup.sql` and `docker compose exec -T db psql -U netshield netshield < backup.sql`. (H2 dev data lives in `services/api/data/`, git-ignored, safe to delete.)

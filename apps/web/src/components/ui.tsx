@@ -10,8 +10,7 @@ export function Logo({ size = 30 }: { size?: number }) {
   return (
     <span className="logo" aria-label="NetShield">
       <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
-        <defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#67e8f9" /><stop offset="1" stopColor="#0e7490" /></linearGradient></defs>
-        <path d="M32 4 9 13v17c0 14 9.5 25.5 23 30 13.5-4.5 23-16 23-30V13z" fill="url(#lg)" />
+                <path d="M32 4 9 13v17c0 14 9.5 25.5 23 30 13.5-4.5 23-16 23-30V13z" fill="#22c5e0" />
         <path d="M20 33c4-7 8-10.5 12-10.5S40 26 44 33" fill="none" stroke="#04202b" strokeWidth="4" strokeLinecap="round" />
         <circle cx="32" cy="40" r="3.5" fill="#04202b" />
       </svg>

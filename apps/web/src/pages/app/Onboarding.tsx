@@ -61,7 +61,7 @@ export function Onboarding() {
         {step === 1 && (
           <div className="stack">
             <h2 style={{ fontSize: '1.3rem' }}>What NetShield can do with and without the home sensor</h2>
-            <div className="table-wrap"><table><thead><tr><th>Feature</th><th>Needs</th></tr></thead><tbody>
+            <div className="table-wrap" tabIndex={0} role="region" aria-label="Table (scrolls sideways on small screens)"><table><thead><tr><th>Feature</th><th>Needs</th></tr></thead><tbody>
               <tr><td>Check links for scam signs</td><td><Pill tone="ok">Works in your browser</Pill></td></tr>
               <tr><td>Find out why your internet is slow</td><td><Pill tone="info">Home sensor</Pill></td></tr>
               <tr><td>Notice new devices on your Wi-Fi</td><td><Pill tone="info">Home sensor + your permission</Pill></td></tr>

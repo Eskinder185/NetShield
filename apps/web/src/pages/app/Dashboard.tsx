@@ -70,7 +70,7 @@ export function Dashboard() {
       <div className="grid grid-4">
         <div className="card tile"><span className="tile-label"><Stethoscope size={16} aria-hidden="true" />Internet</span>
           <span className="tile-value">{online ? vm.label : 'Not measured'}</span>
-          <Pill tone={online ? vm.tone : 'neutral'}>{online ? (ws.mode === 'demo' ? 'Demo data' : 'Live') : 'No live data'}</Pill></div>
+          {ws.mode === 'demo' ? <Pill tone="demo">Demo data</Pill> : <Pill tone={online ? vm.tone : 'neutral'}>{online ? 'Live measurement' : 'No live data'}</Pill>}</div>
         <div className="card tile"><span className="tile-label"><Laptop size={16} aria-hidden="true" />Devices</span>
           <span className="tile-value">{devices.devices.length} seen</span>
           <span className={unknownDevices ? 'pill pill-warn' : 'faint'}>{unknownDevices ? `${unknownDevices} not yet identified` : devices.consented ? 'All identified' : 'Device checking is off'}</span></div>
@@ -89,12 +89,14 @@ export function Dashboard() {
             verify="We'll run the checks again and compare the results. We only say it's fixed if the new measurements show it."
             actions={<LinkButton to={`${ws.basePath}/internet-doctor`} icon={Stethoscope}>Help me fix this</LinkButton>} />
         )}
-        {open.slice(0, 3).map((f) => (
-          <AlertCard key={f.id} severity={f.severity} title={f.title}
-            what="A device we haven't seen before joined your network." why="If you don't recognize it, someone you don't know could be using your Wi-Fi."
-            todo={f.recommendation} verify="Once you tell us what it is, we'll stop flagging it."
-            actions={<LinkButton to={`${ws.basePath}/devices`} icon={Laptop} variant="secondary">Help me identify it</LinkButton>} />
-        ))}
+        {open.length > 0 && (
+          <AlertCard severity={open.some((f) => f.severity === 'HIGH') ? 'HIGH' : 'MEDIUM'}
+            title={open.length === 1 ? open[0].title : `${open.length} devices we don't recognize appeared on your network`}
+            what={open.length === 1 ? "A device we haven't seen before joined your network." : `${open.length} devices we haven't seen before joined your network.`}
+            why="If you don't recognize them, someone you don't know could be using your Wi-Fi."
+            todo={open[0].recommendation} verify="Once you tell us what each one is, we'll stop flagging it."
+            actions={<LinkButton to={`${ws.basePath}/devices`} icon={Laptop} variant="secondary">{open.length === 1 ? 'Help me identify it' : 'Help me identify them'}</LinkButton>} />
+        )}
         {!open.length && !(online && diagnosis.verdict !== 'HEALTHY' && diagnosis.verdict !== 'INSUFFICIENT_EVIDENCE') && (
           <div className="card">
             <p style={{ marginBottom: 8 }}><strong>Nothing urgent from what NetShield can see.</strong></p>

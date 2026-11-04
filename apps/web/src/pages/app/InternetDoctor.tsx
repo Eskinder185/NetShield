@@ -57,7 +57,7 @@ export function InternetDoctor() {
 
       {ws.mode === 'demo' && ws.setDemoScenario && (
         <div className="card card-flat">
-          <h3 style={{ fontSize: '1.05rem' }}>Demo: pick a made-up situation</h3>
+          <h2 className="card-title" style={{ fontSize: '1.05rem' }}>Demo: pick a made-up situation</h2>
           <p className="faint">These are scripted scenarios so you can see every kind of result. Real results come only from a home sensor.</p>
           <div className="chips" role="group" aria-label="Demo scenarios">
             {(Object.keys(SCENARIO_LABELS) as Verdict[]).map((v) => (
@@ -134,7 +134,7 @@ function Result({ d, mode, onStart, fixing }: { d: Diagnosis; mode: string; onSt
   const problem = d.verdict !== 'HEALTHY' && d.verdict !== 'INSUFFICIENT_EVIDENCE';
   const sev = m.tone === 'danger' ? 'HIGH' : m.tone === 'warn' ? 'MEDIUM' : 'INFO';
   return (
-    <AlertCard severity={d.verdict === 'HEALTHY' ? 'INFO' : sev} title={d.headline}
+    <AlertCard level={2} severity={d.verdict === 'HEALTHY' ? 'INFO' : sev} title={d.headline}
       what={d.explanation}
       why={problem ? 'Until this is sorted, you may notice pages not loading, calls freezing or games lagging.' : undefined}
       todo={d.action}
@@ -145,7 +145,7 @@ function Result({ d, mode, onStart, fixing }: { d: Diagnosis; mode: string; onSt
       tech={(
         <div className="stack">
           <p><strong>Rule:</strong> {m.technical}</p>
-          <div className="table-wrap"><table>
+          <div className="table-wrap" tabIndex={0} role="region" aria-label="Table (scrolls sideways on small screens)"><table>
             <thead><tr><th>Checked</th><th>Samples</th><th>Failed</th><th>Typical delay</th><th>Delay variation</th></tr></thead>
             <tbody>{Object.entries(d.evidence).map(([k, s]) => (
               <tr key={k}><td>{KIND_LABEL[k] ?? k} <span className="faint">({k})</span></td><td>{s.count}</td><td>{s.lossPct.toFixed(0)}%</td><td>{fmtMs(s.medianMs)}</td><td>{fmtMs(s.jitterMs)}</td></tr>

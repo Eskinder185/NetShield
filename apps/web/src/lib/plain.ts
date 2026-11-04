@@ -43,7 +43,8 @@ export function timeAgo(iso: string | null | undefined, now = Date.now()): strin
   if (s < 45) return 'just now';
   if (s < 3600) return `${Math.round(s / 60)} min ago`;
   if (s < 86400) return `${Math.round(s / 3600)} h ago`;
-  return `${Math.round(s / 86400)} days ago`;
+  const d = Math.round(s / 86400);
+  return d === 1 ? '1 day ago' : `${d} days ago`;
 }
 
 export function fmtMs(v: number | null | undefined): string {

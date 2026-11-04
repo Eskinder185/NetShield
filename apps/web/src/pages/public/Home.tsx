@@ -65,11 +65,11 @@ export function Home() {
         <div className="container">
           <span className="eyebrow">Five answers in seconds</span>
           <h2>Open NetShield and know where you stand.</h2>
-          <div className="grid grid-3" style={{ marginTop: 'var(--space-5)' }}>
+          <ul className="stat-list" style={{ marginTop: 'var(--space-5)', maxWidth: 820 }}>
             {[['Is my internet working properly?', 'A plain verdict, plus the evidence behind it.'], ['Are there security problems?', 'Prioritized, with the reason each one matters.'], ['Are my devices OK?', 'Which ones we know, which ones we don\'t.'], ['What should I do next?', 'One clear next step at a time.'], ['Can NetShield help fix it?', 'Guided steps, then a re-check to confirm.']].map(([q, a]) => (
-              <div key={q} className="card"><h3>{q}</h3><p className="muted" style={{ marginBottom: 0 }}>{a}</p></div>
+              <li key={q}><span><strong>{q}</strong><span className="muted">{a}</span></span></li>
             ))}
-          </div>
+          </ul>
         </div>
       </section>
 
@@ -109,7 +109,7 @@ export function Home() {
           <span className="eyebrow">Who it&apos;s for</span>
           <h2>Made for people who just want it to work.</h2>
           <p className="faint">These are illustrative situations, not customer stories.</p>
-          <div className="grid grid-3" style={{ marginTop: 'var(--space-5)' }}>
+          <div className="grid grid-who" style={{ marginTop: 'var(--space-5)' }}>
             {WHO.map(([Icon, t, d]) => <div key={t} className="card"><div className="feature-icon"><Icon size={22} aria-hidden="true" /></div><h3>{t}</h3><p className="muted" style={{ marginBottom: 0 }}>{d}</p></div>)}
           </div>
         </div>

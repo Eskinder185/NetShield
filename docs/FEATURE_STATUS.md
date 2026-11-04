@@ -38,7 +38,7 @@ Test evidence (last run 2026-11-04): API 38/38, agent 9/9, web 43/43 (incl. axe 
 | Rules-based assistant | I03 (partial), I11 | Working/Tested | `Assistant` | Keyword rules over real check data. No LLM; adapter **Planned**. |
 | Advanced Lab | L02, L05–L06 (partial) | Demo | `Lab` | Glossary real; simulations clearly marked SIMULATED; integrations all "Not configured". |
 | Onboarding | A01 | Working | `Onboarding.tsx` | Skippable steps, sensor pairing, consent. |
-| Dark/light, responsive, a11y baseline | J05, J06 | Working/Tested | `styles/`, axe tests | Contrast and layout need browser QA — see BUILD_LOG. |
+| Dark/light, responsive, a11y | J05, J06 | Working/Tested | `styles/`, `qa/audit.mjs`, axe tests | Real-Chrome audit 126/126 clean (contrast, overflow, targets). Manual screen-reader/keyboard walkthrough not done. See `DESIGN_SYSTEM.md`. |
 | Marketing site | — | Working/Tested | `pages/public` | Pricing is preview only, no checkout. Legal pages are drafts. |
 | Docker Compose, CI | M07 | Written; compose config validated | `docker-compose.yml`, `.github/workflows/ci.yml` | **Containers never built/run here (Docker daemon off).** CI not run (no push). SBOM generation not yet configured. |
 | Payments/billing, email, notifications | M12, J10 | Gated | | needs third-party accounts |
