@@ -3,7 +3,7 @@
 Legend: **Working/Tested** (implemented, automated tests pass) · **Working** (implemented, manually exercised only) · **Demo** (synthetic data only) · **Gated** (needs setup you must do) · **Planned** · **Blocked**.
 IDs refer to the 161-feature catalog in `NetShield_Claude_Code_Autonomous_Build_Prompt.md`.
 
-Test evidence (last run 2026-11-04): API 37/37, agent 9/9, web 43/43 (incl. axe checks), `tsc`, `eslint`, `vite build` clean. See `BUILD_LOG.md`.
+Test evidence (last run 2026-11-04): API 38/38, agent 9/9, web 43/43 (incl. axe checks), `tsc`, `eslint`, `vite build` clean. See `BUILD_LOG.md`.
 
 | Area | IDs | Status | Where | Evidence / notes |
 |---|---|---|---|---|
@@ -43,6 +43,7 @@ Test evidence (last run 2026-11-04): API 37/37, agent 9/9, web 43/43 (incl. axe 
 | Docker Compose, CI | M07 | Written; compose config validated | `docker-compose.yml`, `.github/workflows/ci.yml` | **Containers never built/run here (Docker daemon off).** CI not run (no push). SBOM generation not yet configured. |
 | Payments/billing, email, notifications | M12, J10 | Gated | | needs third-party accounts |
 | DNS filtering, blocklists, allowlists | D05, D06 | Gated | | needs resolver/gateway integration |
+| Integration adapter interfaces (all "not configured") | A07, D11, H01, I02 | Working/Tested (interfaces only) | `integration/`, `GET /api/integrations` | No real adapter exists. |
 | Wazuh/Suricata, CVE feeds, honeypots | D11–D13, L09 | Planned | | |
 | Router adapters, isolation, VLAN wizards | A07, C12, F06 | Planned/Gated | | |
 | Browser extension | E04 | Planned | | |

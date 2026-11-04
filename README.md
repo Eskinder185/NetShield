@@ -41,7 +41,7 @@ Options: `--dns-names a,b` `--public-ips a,b` `--http-targets https://…` `--in
 
 ## Tests
 ```bash
-cd services/api   && mvn -B test     # 37 tests
+cd services/api   && mvn -B test     # 38 tests
 cd services/agent && mvn -B test     # 9 tests
 cd apps/web       && npm ci && npm run lint && npm run typecheck && npm test && npm run build   # 43 tests
 ```

@@ -325,6 +325,14 @@ class ApiIntegrationTest {
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM sensors WHERE site_id=?", Integer.class, UUID.fromString(a.siteId)));
     }
 
+    @Test void integrationsAreAllHonestlyUnconfiguredAndRequireLogin() throws Exception {
+        mvc.perform(get("/api/integrations")).andExpect(status().isUnauthorized());
+        Account a = register();
+        JsonNode l = om.readTree(mvc.perform(get("/api/integrations").session(a.session)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        assertEquals(6, l.size());
+        for (JsonNode i : l) assertEquals("NOT_CONFIGURED", i.get("status").asText());
+    }
+
     @Test void malformedBodyReturnsCleanJsonError() throws Exception {
         mvc.perform(post("/api/auth/login").with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{nope"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.error").value("Malformed request"));
