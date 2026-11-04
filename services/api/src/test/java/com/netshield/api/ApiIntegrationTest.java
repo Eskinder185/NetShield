@@ -25,6 +25,7 @@ import org.springframework.test.web.servlet.MvcResult;
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@org.springframework.test.context.ActiveProfiles("test")
 class ApiIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper om;

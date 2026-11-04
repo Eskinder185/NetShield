@@ -38,6 +38,16 @@ public class ApiErrors {
         return body(HttpStatus.BAD_REQUEST, "Malformed request");
     }
 
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    ResponseEntity<Map<String, Object>> notFound(Exception e) {
+        return body(HttpStatus.NOT_FOUND, "Not found");
+    }
+
+    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+    ResponseEntity<Map<String, Object>> methodNotAllowed(Exception e) {
+        return body(HttpStatus.METHOD_NOT_ALLOWED, "Method not allowed");
+    }
+
     @ExceptionHandler(Exception.class)
     ResponseEntity<Map<String, Object>> other(Exception e) throws Exception {
         if (e instanceof org.springframework.security.access.AccessDeniedException

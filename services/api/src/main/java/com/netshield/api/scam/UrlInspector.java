@@ -40,7 +40,11 @@ public final class UrlInspector {
             return malformed("That doesn't look like a web link.", "The text is empty, too long, or contains control characters.");
         }
         String s = raw.trim();
-        if (!s.matches("(?i)^[a-z][a-z0-9+.-]*:.*")) s = "https://" + s; // tolerate "example.com/path"
+        int sep = s.indexOf("://");
+        if (sep >= 0 && !s.substring(0, sep).matches("(?i)[a-z][a-z0-9+.-]*")) {
+            return malformed("That doesn't look like a valid web link.", "The part before '://' isn't a valid link type.");
+        }
+        if (!s.matches("(?i)^[a-z][a-z0-9+.-]*://.*") && !s.matches("(?i)^[a-z][a-z0-9+.-]*:[^/].*")) s = "https://" + s; // tolerate "example.com/path"
         URI uri;
         try {
             uri = new URI(s);
@@ -51,15 +55,23 @@ public final class UrlInspector {
         if (!scheme.equals("http") && !scheme.equals("https")) {
             return malformed("This isn't a normal web link.", "Only http and https links are checked (found '" + scheme + ":').");
         }
-        String host = uri.getHost();
-        if (host == null || host.isBlank()) {
+        // getHost() is null for non-ASCII hosts, so split the raw authority by hand (still no network access).
+        String authority = uri.getRawAuthority();
+        if (authority == null || authority.isBlank()) {
+            return malformed("That doesn't look like a valid web link.", "No website name could be found in it.");
+        }
+        int at = authority.lastIndexOf('@');
+        String userInfo = at >= 0 ? authority.substring(0, at) : null;
+        String hostPort = at >= 0 ? authority.substring(at + 1) : authority;
+        String host = hostPort.startsWith("[") ? hostPort : hostPort.replaceFirst(":[0-9]*$", "");
+        if (host.isBlank()) {
             return malformed("That doesn't look like a valid web link.", "No website name could be found in it.");
         }
         host = host.toLowerCase(Locale.ROOT);
         if (host.endsWith(".")) host = host.substring(0, host.length() - 1);
 
         List<Signal> sig = new ArrayList<>();
-        if (uri.getRawUserInfo() != null) {
+        if (userInfo != null) {
             sig.add(new Signal("EMBEDDED_CREDENTIALS", "The link hides its real destination before an @ sign",
                     "Everything before the @ is ignored by the browser; the real site is '" + host + "'. Scammers use this to make a link look trusted.", 4));
         }
@@ -97,13 +109,19 @@ public final class UrlInspector {
         if (dots >= 4) {
             sig.add(new Signal("MANY_SUBDOMAINS", "Very long website name with many parts", "Scammers pile on parts so that a trusted name appears at the start. The part that counts is '" + registrable + "'.", 2));
         }
-        // Brand impersonation: brand appears in the host but the registrable domain is not an official one.
-        String compact = ascii.replace("-", "").replace(".", "");
+        // Brand impersonation: a brand name (or look-alike) in the host while the registrable domain is not an official one.
+        String[] tokens = ascii.split("[.-]");
         for (var e : BRANDS.entrySet()) {
+            String brand = e.getKey();
             boolean official = e.getValue().contains(registrable);
-            if (!official && (compact.contains(e.getKey()) || lookalike(registrable, e.getKey()))) {
-                sig.add(new Signal("BRAND_LOOKALIKE", "Looks like it's pretending to be " + capitalize(e.getKey()),
-                        "The name contains or imitates '" + e.getKey() + "', but the actual site is '" + registrable + "', which isn't one of its official addresses we know.", 4));
+            boolean hit = lookalike(registrable, brand);
+            for (String t : tokens) {
+                String n = leet(t);
+                if (n.equals(brand) || (n.startsWith(brand) && KEYWORDS.matcher(n.substring(brand.length())).find())) hit = true;
+            }
+            if (!official && hit) {
+                sig.add(new Signal("BRAND_LOOKALIKE", "Looks like it's pretending to be " + capitalize(brand),
+                        "The name contains or imitates '" + brand + "', but the actual site is '" + registrable + "', which isn't one of its official addresses we know.", 4));
                 break;
             }
         }
@@ -161,6 +179,10 @@ public final class UrlInspector {
             prev = cur;
         }
         return prev[b.length()];
+    }
+
+    private static String leet(String t) {
+        return t.replace("0", "o").replace("1", "l").replace("3", "e").replace("5", "s");
     }
 
     private static String capitalize(String s) {
