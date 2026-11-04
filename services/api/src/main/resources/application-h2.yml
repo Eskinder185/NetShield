@@ -1,0 +1,8 @@
+# No-Docker local development profile: embedded H2 in PostgreSQL mode, data kept in ./data (git-ignored).
+# Run: mvn spring-boot:run -Dspring-boot.run.profiles=h2
+spring:
+  datasource:
+    url: jdbc:h2:file:./data/netshield;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver

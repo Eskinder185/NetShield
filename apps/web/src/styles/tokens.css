@@ -1,0 +1,90 @@
+/* NetShield design tokens. Every colour below is paired with an icon and a text label in components,
+   so meaning never depends on colour alone. Contrast of text tokens against their surfaces is >= 4.5:1. */
+:root {
+  color-scheme: dark;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Segoe UI Variable Display", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --bg: #060c18;
+  --bg-elev: #0b1424;
+  --surface: #0f1b30;
+  --surface-2: #14233d;
+  --border: #223452;
+  --border-strong: #35507a;
+  --text: #eaf1fb;
+  --text-muted: #a3b4cd;
+  --text-faint: #8195b3;
+
+  --accent: #22d3ee;
+  --accent-strong: #67e8f9;
+  --accent-ink: #04222b;
+  --accent-soft: rgba(34, 211, 238, 0.12);
+  --accent-glow: rgba(34, 211, 238, 0.28);
+
+  --ok: #4ade80;     --ok-soft: rgba(74, 222, 128, 0.13);
+  --warn: #fbbf24;   --warn-soft: rgba(251, 191, 36, 0.13);
+  --danger: #fb7185; --danger-soft: rgba(251, 113, 133, 0.14);
+  --info: #60a5fa;   --info-soft: rgba(96, 165, 250, 0.14);
+  --neutral: #9fb0c9; --neutral-soft: rgba(159, 176, 201, 0.13);
+
+  --radius-sm: 8px; --radius: 14px; --radius-lg: 22px; --radius-pill: 999px;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px; --space-7: 48px; --space-8: 72px; --space-9: 112px;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 12px 40px -12px rgba(0, 0, 0, 0.6);
+  --focus: 0 0 0 3px var(--bg), 0 0 0 5px var(--accent-strong);
+  --gradient-hero: radial-gradient(900px 480px at 78% -10%, rgba(34, 211, 238, 0.18), transparent 60%),
+                   radial-gradient(700px 420px at 5% 10%, rgba(59, 130, 246, 0.14), transparent 60%);
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --header-h: 68px;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f5f8fc;
+  --bg-elev: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #eef3fa;
+  --border: #d3deec;
+  --border-strong: #9db3d1;
+  --text: #0b1a30;
+  --text-muted: #3d5273;
+  --text-faint: #566b8c;
+
+  --accent: #0e7490;
+  --accent-strong: #0b5f77;
+  --accent-ink: #ffffff;
+  --accent-soft: rgba(14, 116, 144, 0.1);
+  --accent-glow: rgba(14, 116, 144, 0.22);
+
+  --ok: #15803d;     --ok-soft: rgba(21, 128, 61, 0.1);
+  --warn: #92400e;   --warn-soft: rgba(217, 119, 6, 0.13);
+  --danger: #be123c; --danger-soft: rgba(190, 18, 60, 0.09);
+  --info: #1d4ed8;   --info-soft: rgba(29, 78, 216, 0.09);
+  --neutral: #475a78; --neutral-soft: rgba(71, 90, 120, 0.1);
+
+  --shadow-1: 0 1px 2px rgba(15, 30, 60, 0.08);
+  --shadow-2: 0 14px 40px -16px rgba(15, 30, 60, 0.25);
+  --focus: 0 0 0 3px var(--bg), 0 0 0 5px var(--accent);
+  --gradient-hero: radial-gradient(900px 480px at 78% -10%, rgba(14, 116, 144, 0.14), transparent 60%),
+                   radial-gradient(700px 420px at 5% 10%, rgba(59, 130, 246, 0.1), transparent 60%);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    color-scheme: light;
+    --bg: #f5f8fc; --bg-elev: #ffffff; --surface: #ffffff; --surface-2: #eef3fa;
+    --border: #d3deec; --border-strong: #9db3d1;
+    --text: #0b1a30; --text-muted: #3d5273; --text-faint: #566b8c;
+    --accent: #0e7490; --accent-strong: #0b5f77; --accent-ink: #ffffff; --accent-soft: rgba(14, 116, 144, 0.1); --accent-glow: rgba(14, 116, 144, 0.22);
+    --ok: #15803d; --ok-soft: rgba(21, 128, 61, 0.1);
+    --warn: #92400e; --warn-soft: rgba(217, 119, 6, 0.13);
+    --danger: #be123c; --danger-soft: rgba(190, 18, 60, 0.09);
+    --info: #1d4ed8; --info-soft: rgba(29, 78, 216, 0.09);
+    --neutral: #475a78; --neutral-soft: rgba(71, 90, 120, 0.1);
+    --shadow-1: 0 1px 2px rgba(15, 30, 60, 0.08);
+    --shadow-2: 0 14px 40px -16px rgba(15, 30, 60, 0.25);
+    --focus: 0 0 0 3px var(--bg), 0 0 0 5px var(--accent);
+    --gradient-hero: radial-gradient(900px 480px at 78% -10%, rgba(14, 116, 144, 0.14), transparent 60%), radial-gradient(700px 420px at 5% 10%, rgba(59, 130, 246, 0.1), transparent 60%);
+  }
+}
