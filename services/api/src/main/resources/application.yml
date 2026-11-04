@@ -1,0 +1,21 @@
+spring:
+  application.name: netshield-api
+  datasource:
+    url: ${NETSHIELD_DB_URL:jdbc:postgresql://localhost:5432/netshield}
+    username: ${NETSHIELD_DB_USER:netshield}
+    password: ${NETSHIELD_DB_PASSWORD:netshield_dev_only}
+  flyway.enabled: true
+  jackson.default-property-inclusion: non_null
+server:
+  port: ${NETSHIELD_PORT:8080}
+  address: ${NETSHIELD_BIND:127.0.0.1}
+  servlet.session.cookie:
+    http-only: true
+    same-site: lax
+    secure: ${NETSHIELD_COOKIE_SECURE:false}
+  error.include-message: never
+netshield:
+  cors-origins: ${NETSHIELD_CORS_ORIGINS:http://localhost:5173}
+  sensor-stale-seconds: 180
+management.endpoints.web.exposure.include: health
+springdoc.swagger-ui.path: /api/docs
