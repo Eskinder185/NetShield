@@ -7,6 +7,7 @@ import App from '../App';
 import { AuthProvider } from '../lib/hooks';
 import { createDemoWorkspace } from '../demo/demoWorkspace';
 import { timeAgo, fmtMs } from '../lib/plain';
+import { api } from '../lib/api';
 
 function mount(path: string) {
   return render(
@@ -57,6 +58,83 @@ describe('demo workspace', () => {
     expect(p.verifiedCount).toBe(0);
     expect(p.items.every((i) => !i.verified)).toBe(true);
     expect(p.items.find((i) => i.key === 'wps_off')?.status).toBe('SELF_REPORTED');
+  });
+});
+
+describe('coverage map', () => {
+  it('shows explicit monitoring and unknown states, with selectable device limits', async () => {
+    const user = userEvent.setup();
+    const { container } = mount('/demo/protection');
+    expect(await screen.findByRole('heading', { name: /your coverage map/i })).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: /known connected devices/i }));
+    expect(await screen.findByRole('heading', { name: /observed devices/i })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /living room tv/i }));
+    expect(screen.getByText(/cannot verify this device.s firmware/i)).toBeInTheDocument();
+    expect(screen.queryByText(/fully protected/i)).toBeNull();
+    expect(await a11y(container)).toEqual([]);
+  });
+});
+
+describe('Scam Rescue', () => {
+  it('creates a private recovery checklist, saves progress, exports, and deletes it', async () => {
+    const user = userEvent.setup();
+    const { container } = mount('/demo/scam-shield');
+    await user.click(await screen.findByRole('button', { name: /i entered a password/i }));
+    const change = await screen.findByRole('checkbox', { name: /change the exposed password/i });
+    await user.click(change);
+    await waitFor(() => expect(change).toBeChecked());
+    expect(screen.getByText(/1 of 6 steps you marked done/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /export summary/i })).toHaveAttribute('download', 'netshield-scam-recovery.json');
+    expect(screen.getByText(/never enter passwords, recovery codes/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /delete this case/i }));
+    await user.click(screen.getByRole('button', { name: /confirm delete/i }));
+    await waitFor(() => expect(screen.queryByRole('checkbox', { name: /change the exposed password/i })).toBeNull());
+    expect(await a11y(container)).toEqual([]);
+  });
+
+  it('keeps demo link checks in the browser', async () => {
+    const user = userEvent.setup();
+    const inspect = vi.spyOn(api, 'inspectUrl');
+    mount('/demo/scam-shield');
+    await user.click(await screen.findByRole('button', { name: /paypa1-secure-login/i }));
+    expect(await screen.findByText(/imitates a familiar brand/i)).toBeInTheDocument();
+    expect(inspect).not.toHaveBeenCalled();
+    inspect.mockRestore();
+  });
+});
+
+describe('reliability report', () => {
+  it('labels observation gaps and keeps the demo evidence synthetic', async () => {
+    const user = userEvent.setup();
+    const { container } = mount('/demo/reports');
+    expect(await screen.findByRole('heading', { name: /internet reliability evidence/i })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Week' }));
+    expect(await screen.findByText(/no measurements in this synthetic period/i)).toBeInTheDocument();
+    expect(screen.getByText(/do not establish where the fault occurred/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/synthetic/i).length).toBeGreaterThan(0);
+    expect(await a11y(container)).toEqual([]);
+  });
+});
+
+describe('Trusted helpers', () => {
+  it('uses a one-time demo invitation with scoped notes and immediate revocation', async () => {
+    const user = userEvent.setup();
+    const { container } = mount('/demo/helpers');
+    await user.click(await screen.findByRole('button', { name: /create one-time invitation/i }));
+    const token = (await screen.findByRole('textbox', { name: /one-time invitation code/i }) as HTMLInputElement).value;
+    await user.type(screen.getByRole('textbox', { name: /^invitation code$/i }), token);
+    await user.click(screen.getByRole('button', { name: /accept invitation/i }));
+    await user.click(await screen.findByRole('button', { name: /open summary/i }));
+    expect(await screen.findByRole('heading', { name: /shared summary/i })).toBeInTheDocument();
+    await user.type(screen.getByRole('textbox', { name: /suggest a safe next step/i }), 'Check the router again.');
+    await user.click(screen.getByRole('button', { name: /save suggestion/i }));
+    expect(await screen.findByText(/check the router again/i)).toBeInTheDocument();
+    expect(await screen.findByText(/suggestion saved for the owner/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /revoke access/i }));
+    await user.click(screen.getByRole('button', { name: /confirm revoke/i }));
+    expect(await screen.findByText(/access revoked immediately/i)).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('heading', { name: /shared summary/i })).toBeNull());
+    expect(await a11y(container)).toEqual([]);
   });
 });
 
@@ -122,7 +200,7 @@ describe('demo app', () => {
     expect(await screen.findByRole('heading', { name: /websites are having trouble loading/i }, { timeout: 3000 })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /help me fix this/i }));
     await user.click(await screen.findByRole('button', { name: /check if it worked/i }));
-    expect(await screen.findByText(/confirmed: it looks fixed/i, undefined, { timeout: 3000 })).toBeInTheDocument();
+    expect(await screen.findByText(/recent checks show improvement/i, undefined, { timeout: 3000 })).toBeInTheDocument();
     expect(screen.getByText(/scripted demo result/i)).toBeInTheDocument();
   });
 

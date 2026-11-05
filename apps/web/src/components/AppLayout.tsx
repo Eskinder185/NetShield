@@ -14,6 +14,7 @@ const ITEMS = [
   { to: 'devices', label: 'My Devices', icon: Laptop, group: 'Your home' },
   { to: 'protection', label: 'Protection', icon: ShieldCheck, group: 'Your home' },
   { to: 'scam-shield', label: 'Scam Shield', icon: Link2, group: 'Stay safe' },
+  { to: 'helpers', label: 'Trusted helpers', icon: Users, group: 'Stay safe' },
   { to: 'family', label: 'Family', icon: Users, group: 'Stay safe' },
   { to: 'privacy', label: 'Privacy & VPN', icon: Lock, group: 'Stay safe' },
   { to: 'reports', label: 'Reports', icon: FileText, group: 'More' },

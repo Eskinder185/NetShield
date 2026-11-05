@@ -115,7 +115,7 @@ class ApiIntegrationTest {
         String sid = sensorId(a);
         String base = "/api/sites/" + a.siteId;
         // B tries every site-scoped resource of A.
-        for (String path : List.of("", "/sensors", "/diagnosis", "/diagnosis/history", "/devices", "/findings", "/protection", "/export", "/export/measurements.csv", "/audit")) {
+        for (String path : List.of("", "/sensors", "/diagnosis", "/diagnosis/history", "/reliability", "/devices", "/findings", "/protection", "/coverage", "/scam-rescue", "/helpers", "/export", "/export/measurements.csv", "/audit")) {
             mvc.perform(get(base + path).session(b.session)).andExpect(status().isNotFound());
         }
         mvc.perform(delete(base + "/sensors/" + sid).session(b.session).with(csrf())).andExpect(status().isNotFound());
@@ -125,6 +125,223 @@ class ApiIntegrationTest {
         // A's sensor is still active.
         mvc.perform(post("/api/ingest/heartbeat").header("Authorization", "Bearer " + tokenA).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"agentVersion\":\"t\"}")).andExpect(status().isOk());
+    }
+
+    @Test void coverageNeverTreatsEnrollmentOrConsentAsVerifiedProtection() throws Exception {
+        Account a = register();
+        String path = "/api/sites/" + a.siteId + "/coverage";
+        JsonNode initial = om.readTree(mvc.perform(get(path).session(a.session)).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+        assertFalse(initial.get("sensorOnline").asBoolean());
+        assertEquals("NOT_CONFIGURED", layer(initial, "diagnostics").get("state").asText());
+        assertEquals("STATUS_UNKNOWN", layer(initial, "router").get("state").asText());
+        String token = enroll(a);
+        mvc.perform(post("/api/ingest/heartbeat").header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON).content("{}")).andExpect(status().isOk());
+        JsonNode paired = om.readTree(mvc.perform(get(path).session(a.session)).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+        assertEquals("STATUS_UNKNOWN", layer(paired, "diagnostics").get("state").asText());
+        assertEquals("STATUS_UNKNOWN", layer(paired, "router").get("state").asText());
+        assertEquals("NOT_CONFIGURED", layer(paired, "devices").get("state").asText());
+        ingest(token, measurementsJson("GATEWAY", "router", true, 2, 2));
+        ingest(token, measurementsJson("DNS", "example.com", true, 20, 2));
+        ingest(token, measurementsJson("PUBLIC_IP", "1.1.1.1", true, 15, 2));
+        JsonNode observed = om.readTree(mvc.perform(get(path).session(a.session)).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+        assertEquals("MONITORING_AVAILABLE", layer(observed, "diagnostics").get("state").asText());
+    }
+
+    JsonNode layer(JsonNode response, String key) {
+        for (JsonNode layer : response.get("layers")) if (key.equals(layer.get("key").asText())) return layer;
+        throw new AssertionError("Missing coverage layer: " + key);
+    }
+
+    @Test void scamRecoveryIsScopedPersistentAndDeletableWithoutSecrets() throws Exception {
+        Account owner = register(), other = register();
+        String base = "/api/sites/" + owner.siteId + "/scam-rescue";
+        JsonNode created = om.readTree(mvc.perform(post(base).session(owner.session).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"type\":\"PASSWORD\"}"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        String caseId = created.get("id").asText();
+        assertEquals("USER_REPORTED_ONLY", created.get("evidenceLevel").asText());
+        assertTrue(created.get("steps").size() >= 4);
+        assertFalse(created.toString().contains("correct-horse-battery"));
+        mvc.perform(get(base + "/" + caseId).session(other.session)).andExpect(status().isNotFound());
+        mvc.perform(get(base + "/" + caseId + "/export").session(other.session)).andExpect(status().isNotFound());
+        mvc.perform(put(base + "/" + caseId + "/steps/change").session(other.session).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"done\":true}"))
+                .andExpect(status().isNotFound());
+        JsonNode updated = om.readTree(mvc.perform(put(base + "/" + caseId + "/steps/change").session(owner.session).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"done\":true}"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        assertTrue(updated.get("steps").toString().contains("\"done\":true"));
+        assertEquals(1, om.readTree(mvc.perform(get(base).session(owner.session)).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString()).size());
+        mvc.perform(get(base + "/" + caseId + "/export").session(owner.session)).andExpect(status().isOk());
+        mvc.perform(delete(base + "/" + caseId).session(owner.session).with(csrf())).andExpect(status().isOk());
+        mvc.perform(get(base + "/" + caseId).session(owner.session)).andExpect(status().isNotFound());
+    }
+
+    @Test void scamRecoveryRejectsUnknownTypeAndViewerWrites() throws Exception {
+        Account owner = register(), viewer = register();
+        UUID viewerId = jdbc.queryForObject("SELECT id FROM users WHERE email=?", UUID.class, viewer.email);
+        UUID hid = jdbc.queryForObject("SELECT household_id FROM sites WHERE id=?", UUID.class, UUID.fromString(owner.siteId));
+        jdbc.update("INSERT INTO household_memberships(household_id,user_id,role) VALUES (?,?,'VIEWER')", hid, viewerId);
+        String base = "/api/sites/" + owner.siteId + "/scam-rescue";
+        mvc.perform(post(base).session(owner.session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"type\":\"BANK_PASSWORD_SECRET\"}")).andExpect(status().isBadRequest());
+        mvc.perform(post(base).session(viewer.session).with(csrf()).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"type\":\"MONEY\"}")).andExpect(status().isForbidden());
+    }
+
+    @Test void scamRecoveryExpiresAfterThirtyDays() throws Exception {
+        Account a = register();
+        String base = "/api/sites/" + a.siteId + "/scam-rescue";
+        JsonNode created = om.readTree(mvc.perform(post(base).session(a.session).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"type\":\"LINK\"}"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        UUID caseId = UUID.fromString(created.get("id").asText());
+        jdbc.update("UPDATE scam_cases SET created_at=? WHERE id=?", OffsetDateTime.now().minusDays(31), caseId);
+        retention.purge();
+        mvc.perform(get(base + "/" + caseId).session(a.session)).andExpect(status().isNotFound());
+    }
+
+    @Test void reliabilityShowsMeasuredFailureAndMonitoringGapWithoutAttributingIsp() throws Exception {
+        Account a = register();
+        enroll(a);
+        UUID site = UUID.fromString(a.siteId);
+        UUID sensor = UUID.fromString(sensorId(a));
+        OffsetDateTime old = OffsetDateTime.now().minusMinutes(22);
+        OffsetDateTime recent = OffsetDateTime.now().minusMinutes(2);
+        for (int i = 0; i < 3; i++) {
+            addReliabilitySample(site, sensor, "GATEWAY", true, old.plusSeconds(i));
+            addReliabilitySample(site, sensor, "PUBLIC_IP", true, old.plusSeconds(i));
+            addReliabilitySample(site, sensor, "GATEWAY", true, recent.plusSeconds(i));
+            addReliabilitySample(site, sensor, "PUBLIC_IP", false, recent.plusSeconds(i));
+        }
+        JsonNode report = om.readTree(mvc.perform(get("/api/sites/" + a.siteId + "/reliability?days=1").session(a.session))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        String periods = report.get("periods").toString();
+        assertTrue(periods.contains("MONITORING_GAP"));
+        assertTrue(periods.contains("OUTSIDE_FAILURE_OBSERVED"));
+        assertTrue(report.get("methodology").asText().contains("do not prove ISP responsibility"));
+        mvc.perform(get("/api/sites/" + a.siteId + "/reliability?days=2").session(a.session)).andExpect(status().isBadRequest());
+    }
+
+    void addReliabilitySample(UUID site, UUID sensor, String kind, boolean success, OffsetDateTime at) {
+        jdbc.update("INSERT INTO measurements(id,site_id,sensor_id,kind,target,success,latency_ms,measured_at,received_at) VALUES (?,?,?,?,?,?,?,?,?)",
+                UUID.randomUUID(), site, sensor, kind, "test", success, success ? 10.0 : null, at, OffsetDateTime.now());
+    }
+
+    @Test void trustedHelperHasOneTimeScopedRevocableReadOnlySession() throws Exception {
+        Account owner = register(), helper = register(), stranger = register();
+        String base = "/api/sites/" + owner.siteId + "/helpers";
+        JsonNode invite = om.readTree(mvc.perform(post(base).session(owner.session).with(csrf()))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        String token = invite.get("token").asText();
+        String inviteId = invite.get("id").asText();
+        assertTrue(token.startsWith("nshh_"));
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM helper_invitations WHERE token_hash=?", Integer.class, token));
+        mvc.perform(post("/api/helpers/accept").session(helper.session).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"token\":\"" + token + "\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/helpers/accept").session(stranger.session).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"token\":\"" + token + "\"}"))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/api/sites/" + owner.siteId + "/diagnosis").session(helper.session)).andExpect(status().isNotFound());
+        mvc.perform(get("/api/helpers/sessions/" + inviteId).session(stranger.session)).andExpect(status().isNotFound());
+        JsonNode workspace = om.readTree(mvc.perform(get("/api/helpers/sessions/" + inviteId).session(helper.session))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        assertEquals("DIAGNOSTIC_SUMMARY", workspace.get("scope").asText());
+        assertTrue(workspace.has("diagnosis"));
+        assertTrue(mvc.perform(get(base + "/audit").session(owner.session)).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString().contains("HELPER_SUMMARY_VIEWED"));
+        mvc.perform(get(base + "/audit").session(stranger.session)).andExpect(status().isNotFound());
+        mvc.perform(post("/api/helpers/sessions/" + inviteId + "/notes").session(helper.session).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"body\":\"Try the router check again.\"}"))
+                .andExpect(status().isOk());
+        assertEquals(1, om.readTree(mvc.perform(get(base + "/" + inviteId + "/notes").session(owner.session))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).size());
+        mvc.perform(delete(base + "/" + inviteId).session(owner.session).with(csrf())).andExpect(status().isOk());
+        mvc.perform(get("/api/helpers/sessions/" + inviteId).session(helper.session)).andExpect(status().isNotFound());
+        mvc.perform(post("/api/helpers/sessions/" + inviteId + "/notes").session(helper.session).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"body\":\"more\"}"))
+                .andExpect(status().isNotFound());
+        UUID hid = jdbc.queryForObject("SELECT household_id FROM sites WHERE id=?", UUID.class, UUID.fromString(owner.siteId));
+        assertTrue(jdbc.queryForObject("SELECT COUNT(*) FROM audit_events WHERE household_id=? AND action LIKE 'HELPER_%'",
+                Integer.class, hid) >= 4);
+    }
+
+    @Test void deletingSiteDataAlsoEndsHelperAccessAndRemovesNotes() throws Exception {
+        Account owner = register(), helper = register();
+        String base = "/api/sites/" + owner.siteId;
+        JsonNode invite = om.readTree(mvc.perform(post(base + "/helpers").session(owner.session).with(csrf()))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        String id = invite.get("id").asText();
+        mvc.perform(post("/api/helpers/accept").session(helper.session).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"token\":\"" + invite.get("token").asText() + "\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/helpers/sessions/" + id + "/notes").session(helper.session).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"body\":\"Check a cable.\"}"))
+                .andExpect(status().isOk());
+        String exported = mvc.perform(get(base + "/export").session(owner.session)).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertTrue(exported.contains("Check a cable."));
+        assertFalse(exported.contains("token_hash"));
+        mvc.perform(delete(base + "/data").session(owner.session).with(csrf())).andExpect(status().isOk());
+        mvc.perform(get("/api/helpers/sessions/" + id).session(helper.session)).andExpect(status().isNotFound());
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM helper_notes WHERE invitation_id=?", Integer.class, UUID.fromString(id)));
+    }
+
+    @Test void trustedHelperInvitationAndSessionExpire() throws Exception {
+        Account owner = register(), helper = register();
+        String base = "/api/sites/" + owner.siteId + "/helpers";
+        JsonNode invite = om.readTree(mvc.perform(post(base).session(owner.session).with(csrf()))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        String token = invite.get("token").asText();
+        UUID id = UUID.fromString(invite.get("id").asText());
+        jdbc.update("UPDATE helper_invitations SET invite_expires_at=? WHERE id=?", OffsetDateTime.now().minusMinutes(1), id);
+        mvc.perform(post("/api/helpers/accept").session(helper.session).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"token\":\"" + token + "\"}"))
+                .andExpect(status().isNotFound());
+        jdbc.update("UPDATE helper_invitations SET invite_expires_at=? WHERE id=?", OffsetDateTime.now().plusHours(1), id);
+        mvc.perform(post("/api/helpers/accept").session(helper.session).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"token\":\"" + token + "\"}"))
+                .andExpect(status().isOk());
+        jdbc.update("UPDATE helper_invitations SET session_expires_at=? WHERE id=?", OffsetDateTime.now().minusMinutes(1), id);
+        mvc.perform(get("/api/helpers/sessions/" + id).session(helper.session)).andExpect(status().isNotFound());
+    }
+
+    @Test void deletingHelperAccountRemovesItsGrant() throws Exception {
+        Account owner = register(), helper = register();
+        String base = "/api/sites/" + owner.siteId + "/helpers";
+        JsonNode invite = om.readTree(mvc.perform(post(base).session(owner.session).with(csrf()))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        mvc.perform(post("/api/helpers/accept").session(helper.session).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"token\":\"" + invite.get("token").asText() + "\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(delete("/api/account").session(helper.session).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"password\":\"correct-horse-battery\"}"))
+                .andExpect(status().isOk());
+        assertEquals(0, om.readTree(mvc.perform(get(base).session(owner.session)).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString()).size());
+    }
+
+    @Test void expiredHelperGrantAndNotesArePurgedAfterThirtyDays() throws Exception {
+        Account owner = register(), helper = register();
+        JsonNode invite = om.readTree(mvc.perform(post("/api/sites/" + owner.siteId + "/helpers").session(owner.session).with(csrf()))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        String id = invite.get("id").asText();
+        mvc.perform(post("/api/helpers/accept").session(helper.session).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"token\":\"" + invite.get("token").asText() + "\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/helpers/sessions/" + id + "/notes").session(helper.session).with(csrf())
+                .contentType(MediaType.APPLICATION_JSON).content("{\"body\":\"A suggestion.\"}"))
+                .andExpect(status().isOk());
+        jdbc.update("UPDATE helper_invitations SET session_expires_at=? WHERE id=?", OffsetDateTime.now().minusDays(31), UUID.fromString(id));
+        retention.purge();
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM helper_invitations WHERE id=?", Integer.class, UUID.fromString(id)));
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM helper_notes WHERE invitation_id=?", Integer.class, UUID.fromString(id)));
     }
 
     @Test void viewerRoleCannotWrite() throws Exception {
@@ -202,14 +419,27 @@ class ApiIntegrationTest {
         // Retest immediately without new data showing recovery: must not claim improvement.
         JsonNode same = om.readTree(mvc.perform(post("/api/sites/" + a.siteId + "/diagnosis/" + incident + "/retest").session(a.session).with(csrf()))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
-        assertNotEquals("VERIFIED", same.get("outcome").asText());
+        assertEquals("INCONCLUSIVE", same.get("outcome").asText());
+        assertEquals(0, same.get("after").get("sampleCount").asInt());
+        assertEquals(10, same.get("beforeEvidence").get("DNS").get("count").asInt());
 
-        // Fix applied: fresh good DNS measurements.
+        // Put the saved baseline in the past; fresh checks span three minutes, not one burst.
+        jdbc.update("UPDATE incidents SET window_start=?,window_end=? WHERE id=?",
+                OffsetDateTime.now().minusMinutes(20), OffsetDateTime.now().minusMinutes(5), UUID.fromString(incident));
         jdbc.update("DELETE FROM measurements");
         ingest(token, measurementsJson("GATEWAY", "router", true, 2, 10));
         ingest(token, measurementsJson("DNS", "example.com", true, 20, 10));
         ingest(token, measurementsJson("PUBLIC_IP", "1.1.1.1", true, 15, 10));
         ingest(token, measurementsJson("PUBLIC_HTTP", "https://example.com", true, 40, 10));
+        JsonNode burst = om.readTree(mvc.perform(post("/api/sites/" + a.siteId + "/diagnosis/" + incident + "/retest").session(a.session).with(csrf()))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        assertEquals("INCONCLUSIVE", burst.get("outcome").asText());
+        for (String kind : List.of("GATEWAY", "DNS", "PUBLIC_IP", "PUBLIC_HTTP")) {
+            List<UUID> ids = jdbc.query("SELECT id FROM measurements WHERE site_id=? AND kind=? ORDER BY measured_at",
+                    (rs, i) -> rs.getObject(1, UUID.class), UUID.fromString(a.siteId), kind);
+            OffsetDateTime first = OffsetDateTime.now().minusMinutes(4);
+            for (int i = 0; i < ids.size(); i++) jdbc.update("UPDATE measurements SET measured_at=? WHERE id=?", first.plusSeconds(i * 20L), ids.get(i));
+        }
         JsonNode fixed = om.readTree(mvc.perform(post("/api/sites/" + a.siteId + "/diagnosis/" + incident + "/retest").session(a.session).with(csrf()))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
         assertEquals("VERIFIED", fixed.get("outcome").asText());

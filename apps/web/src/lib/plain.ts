@@ -7,7 +7,7 @@ export const VERDICT_META: Record<Verdict, { tone: Tone; label: string; technica
   HEALTHY: { tone: 'ok', label: 'Working normally', technical: 'No rule fired: gateway, DNS and public endpoints within thresholds.' },
   DNS_FAILURE: { tone: 'danger', label: "Websites won't load", technical: 'DNS lookups failing (>=50%) while direct-IP connectivity succeeds and the gateway is reachable.' },
   GATEWAY_ISSUE: { tone: 'danger', label: 'Trouble reaching your router', technical: 'Gateway TCP reachability loss >= 20%.' },
-  UPSTREAM_ISSUE: { tone: 'danger', label: 'Provider problem likely', technical: 'Gateway OK, DNS OK, all public targets failing (>=50% loss each).' },
+  UPSTREAM_ISSUE: { tone: 'danger', label: 'Outside connection trouble', technical: 'Gateway OK, DNS OK, all public targets failing (>=50% loss each). Cause beyond the gateway is not proven.' },
   REMOTE_ENDPOINT_ISSUE: { tone: 'warn', label: 'One website is down', technical: 'Some, not all, public HTTP targets failing; gateway and DNS healthy.' },
   ELEVATED_JITTER: { tone: 'warn', label: 'Uneven connection', technical: 'Mean absolute successive latency difference >= 30 ms.' },
   INSUFFICIENT_EVIDENCE: { tone: 'neutral', label: 'Not enough information', technical: 'Fewer than 5 samples for gateway, DNS or public targets, or sensor offline.' },

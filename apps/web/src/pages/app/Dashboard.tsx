@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, CheckCircle2, CircleSlash, Laptop, MessageCircle, ShieldCheck, Stethoscope, WifiOff, AlertTriangle, Radio } from 'lucide-react';
+import { ArrowRight, CheckCircle2, CircleSlash, Laptop, MessageCircle, ShieldCheck, ShieldAlert, Stethoscope, WifiOff, AlertTriangle, Radio } from 'lucide-react';
 import { Banner, ErrorState, Loading, Pill, LinkButton } from '../../components/ui';
 import { AlertCard } from '../../components/AlertCard';
 import { useAsync } from '../../lib/hooks';
@@ -59,6 +59,11 @@ export function Dashboard() {
           </p>
         </div>
       </section>
+
+      <div className="card card-flat row-between">
+        <div><strong>Worried about a message or a mistake?</strong><p className="muted" style={{ margin: 0 }}>Get calm, step-by-step recovery guidance.</p></div>
+        <LinkButton to={`${ws.basePath}/scam-shield`} icon={ShieldAlert} variant="secondary">I think I got scammed</LinkButton>
+      </div>
 
       {!hasSensor && ws.mode === 'live' && (
         <Banner tone="info" title="Monitoring isn't configured">

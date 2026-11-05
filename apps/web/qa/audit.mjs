@@ -13,7 +13,7 @@ const filter = process.argv[4];
 mkdirSync(out, { recursive: true });
 
 const PAGES = ['/', '/features', '/internet-doctor', '/how-it-works', '/pricing', '/scam-shield', '/contact', '/faq', '/login', '/register',
-  '/demo', '/demo/internet-doctor', '/demo/devices', '/demo/protection', '/demo/scam-shield', '/demo/family', '/demo/privacy',
+  '/demo', '/demo/internet-doctor', '/demo/devices', '/demo/protection', '/demo/scam-shield', '/demo/helpers', '/demo/family', '/demo/privacy',
   '/demo/reports', '/demo/assistant', '/demo/lab', '/demo/settings'];
 const VIEWPORTS = { phone: { width: 390, height: 844 }, tablet: { width: 820, height: 1180 }, desktop: { width: 1440, height: 900 } };
 const THEMES = ['dark', 'light'];

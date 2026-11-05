@@ -1,5 +1,5 @@
 import type {
-  Device, DevicePatch, Diagnosis, Finding, FindingStatus, ProtectionItem, Retest, Sensor, SiteSettings, Stats, Verdict,
+  CoverageLayer, Device, DevicePatch, Diagnosis, Finding, FindingStatus, HelperAuditEvent, HelperInvitation, HelperNote, HelperSession, ProtectionItem, Retest, ScamCase, ScamIncidentType, Sensor, SiteSettings, Stats, Verdict,
 } from '../lib/types';
 import type { Workspace } from '../lib/workspace';
 
@@ -9,6 +9,31 @@ import type { Workspace } from '../lib/workspace';
  */
 const now = () => new Date().toISOString();
 const ago = (min: number) => new Date(Date.now() - min * 60_000).toISOString();
+
+const DEMO_COVERAGE: CoverageLayer[] = [
+  { key: 'router', title: 'Router configuration', state: 'STATUS_UNKNOWN', known: 'No router settings can be verified.', blindSpot: 'No compatible router integration is connected.', nextStep: 'Review router settings using the checklist.', lastObservedAt: null },
+  { key: 'wifi', title: 'Wi-Fi network', state: 'STATUS_UNKNOWN', known: 'The demo sensor checks its path to the router.', blindSpot: 'Wi-Fi security and other devices are not inspected.', nextStep: 'Review Wi-Fi settings in your router.', lastObservedAt: ago(1) },
+  { key: 'dns_filtering', title: 'DNS filtering', state: 'NOT_CONFIGURED', known: 'Website-name lookups are measured.', blindSpot: 'No domains are blocked.', nextStep: 'Consider a filtering service if needed.', lastObservedAt: ago(1) },
+  { key: 'devices', title: 'Known connected devices', state: 'MONITORING_AVAILABLE', known: 'The demo sensor shows five invented devices.', blindSpot: 'Passive inventory cannot find every device.', nextStep: 'Review unfamiliar devices.', lastObservedAt: ago(1) },
+  { key: 'endpoints', title: 'Computers with endpoint support', state: 'UNSUPPORTED', known: 'No endpoint agent is installed.', blindSpot: 'Malware status cannot be verified.', nextStep: 'Use built-in device security tools.', lastObservedAt: null },
+  { key: 'smart_home', title: 'Smart-home devices', state: 'STATUS_UNKNOWN', known: 'Some demo devices are observed.', blindSpot: 'Firmware and traffic are not inspected.', nextStep: 'Check updates in device maker apps.', lastObservedAt: ago(1) },
+  { key: 'family', title: 'Family protection settings', state: 'NOT_CONFIGURED', known: 'No family filtering integration is connected.', blindSpot: 'Content restrictions are not enforced.', nextStep: 'Review device or router controls.', lastObservedAt: null },
+  { key: 'vpn', title: 'VPN coverage', state: 'UNSUPPORTED', known: 'NetShield provides no VPN tunnel.', blindSpot: 'VPN status cannot be inferred.', nextStep: 'Use a trusted VPN if needed.', lastObservedAt: null },
+  { key: 'browser', title: 'Browser protection', state: 'UNSUPPORTED', known: 'The link checker analyzes pasted text.', blindSpot: 'Browser traffic is not inspected.', nextStep: 'Keep browser protection enabled.', lastObservedAt: null },
+  { key: 'monitoring', title: 'Security monitoring', state: 'MONITORING_AVAILABLE', known: 'Demo device observations can flag unfamiliar devices.', blindSpot: 'No full threat detection is present.', nextStep: 'Review open alerts.', lastObservedAt: ago(1) },
+  { key: 'diagnostics', title: 'Network diagnostics', state: 'MONITORING_AVAILABLE', known: 'Demo checks are synthetic.', blindSpot: 'They say nothing about your real network.', nextStep: 'Try Internet Doctor.', lastObservedAt: ago(1) },
+];
+
+const DEMO_SCAM_STEPS: Record<ScamIncidentType, [string, string][]> = {
+  LINK: [['Close the page', 'Do not enter information. If you did, start the matching recovery case.']],
+  PASSWORD: [['Open the official service directly', 'Do not return through the suspicious link.'], ['Change the exposed password', 'Use a new unique password, and change it anywhere else you reused it.'], ['Review sessions and recovery settings', 'Sign out unfamiliar sessions and check recovery information.'], ['Turn on two-step sign-in', 'Use a passkey or authenticator app where available.']],
+  PERSONAL_INFO: [['Identify what was shared', 'Write it down privately outside NetShield.'], ['Watch for misuse', 'Review relevant accounts and identity-protection resources.']],
+  MONEY: [['Contact your provider now', 'Use the number on your card or the official app. Ask about stopping or disputing payment.'], ['Review account activity', 'Check transactions through the official provider.']],
+  DOWNLOAD: [['Do not open the file', 'If installed, disconnect the device until it is checked.'], ['Use trusted device protection', 'Run a built-in security scan and review recent installations.']],
+  IMPERSONATION: [['Contact the real organization', 'Use its official site or a known phone number.']],
+  DELIVERY: [['Check delivery directly', 'Open the carrier app or official site yourself.']],
+  ACCOUNT_ACCESS: [['Secure the account', 'Change the password, end unfamiliar sessions, enable two-step sign-in.'], ['Review recent changes', 'Check purchases, messages and recovery settings.']],
+};
 
 const s = (count: number, loss: number, med: number | null, jit: number | null): Stats => ({ count, lossPct: loss, medianMs: med, jitterMs: jit });
 
@@ -112,6 +137,15 @@ export function createDemoWorkspace(): Workspace {
   ];
   let protection = PROTECTION.map((p) => ({ ...p }));
   let incident: { id: string; before: Verdict } | null = null;
+  let scamCases: ScamCase[] = [];
+  let helperInvites: HelperInvitation[] = [];
+  let helperSessions: HelperSession[] = [];
+  let helperNotes: Record<string, HelperNote[]> = {};
+  let helperAudit: HelperAuditEvent[] = [];
+  let latestHelperToken = '';
+  const logHelper = (action: string, detail: string, actor = 'Demo owner') => {
+    helperAudit = [{ actor, action, detail, created_at: now() }, ...helperAudit];
+  };
   const wait = <T,>(v: T) => new Promise<T>((r) => setTimeout(() => r(v), 120));
 
   const diag = (v: Verdict): Diagnosis => ({
@@ -119,7 +153,7 @@ export function createDemoWorkspace(): Workspace {
   });
 
   const w: Workspace = {
-    mode: 'demo', basePath: '/demo', siteName: 'Demo home',
+    mode: 'demo', basePath: '/demo', siteName: 'Demo home', siteRole: 'OWNER',
     get settings() { return settings; },
     get demoScenario() { return scenario; },
     setDemoScenario(v) { scenario = v; },
@@ -140,7 +174,8 @@ export function createDemoWorkspace(): Workspace {
       const before = incident?.before ?? scenario;
       scenario = 'HEALTHY';
       return wait({ outcome: before === 'HEALTHY' ? 'VERIFIED' : 'VERIFIED', beforeVerdict: before, afterVerdict: 'HEALTHY',
-        detail: 'Demo only: this result is scripted to show what a verified fix looks like. Real retests only report improvement when new measurements show it.', after: diag('HEALTHY') });
+        detail: 'Demo only: this result is scripted to show what a verified fix looks like. Real retests only report improvement when new measurements show it.',
+        beforeEvidence: SCENARIOS[before].evidence, beforeWindowStart: ago(15), beforeWindowEnd: ago(5), verifiedAt: now(), after: diag('HEALTHY') });
     },
     getHistory: () => wait([
       { id: 'h1', verdict: 'DNS_FAILURE' as Verdict, summary: 'Websites are having trouble loading.', created_at: ago(60 * 26) },
@@ -156,12 +191,75 @@ export function createDemoWorkspace(): Workspace {
     getFindings: () => wait([...findings]),
     setFinding: async (id, st: FindingStatus) => { findings = findings.map((f) => (f.id === id ? { ...f, status: st, updated_at: now() } : f)); await wait(0); },
     getProtection: () => wait({ items: protection.map((p) => ({ ...p })), verifiedCount: 0, total: protection.length }),
+    getCoverage: () => wait({ layers: DEMO_COVERAGE.map((layer) => ({ ...layer })), assessedAt: now(), sensorOnline: true }),
+    getReliability: (days) => wait({ requestedStart: ago(days * 24 * 60), requestedEnd: now(), observedStart: ago(90), observedEnd: ago(1), sampleCount: 50,
+      truncated: false, source: 'DEMO_SYNTHETIC',
+      methodology: 'Synthetic five-minute groups for demonstration. Missing periods are unknown, not uptime; this is not evidence about your connection.',
+      periods: [
+        { status: 'DNS_FAILURE_OBSERVED', start: ago(90), end: ago(85), sampleCount: 20, explanation: 'Synthetic website-name lookup failures while direct checks worked.' },
+        { status: 'MONITORING_GAP', start: ago(85), end: ago(10), sampleCount: 0, explanation: 'No measurements in this synthetic period; connection status is unknown.' },
+        { status: 'NORMAL_CHECKS_OBSERVED', start: ago(10), end: ago(1), sampleCount: 30, explanation: 'Synthetic sampled checks succeeded; other times are unknown.' },
+      ] }),
+    getHelperInvitations: () => wait(helperInvites.map((h) => ({ ...h }))),
+    createHelperInvitation: () => {
+      const id = `demo-helper-${Date.now()}`;
+      latestHelperToken = 'nshh_' + '0'.repeat(64);
+      const inviteExpiresAt = ago(-24 * 60);
+      helperInvites = [{ id, scope: 'DIAGNOSTIC_SUMMARY', created_at: now(), invite_expires_at: inviteExpiresAt,
+        accepted_at: null, session_expires_at: null, revoked_at: null, helper_email: null }, ...helperInvites];
+      logHelper('HELPER_INVITED', id);
+      return wait({ id, token: latestHelperToken, scope: 'DIAGNOSTIC_SUMMARY' as const, inviteExpiresAt });
+    },
+    revokeHelperInvitation: async (id) => { helperInvites = helperInvites.map((h) => h.id === id ? { ...h, revoked_at: now() } : h); helperSessions = helperSessions.filter((h) => h.id !== id); logHelper('HELPER_REVOKED', id); await wait(0); },
+    getOwnerHelperNotes: (id) => wait([...(helperNotes[id] ?? [])]),
+    getHelperAudit: () => wait(helperAudit.map((e) => ({ ...e }))),
+    acceptHelperInvitation: async (token) => {
+      const h = helperInvites.find((item) => !item.revoked_at && !item.accepted_at && token === latestHelperToken);
+      if (!h) throw new Error('Invitation invalid or already used.');
+      h.accepted_at = now(); h.session_expires_at = ago(-120); h.helper_email = 'demo-helper@example.com';
+      helperSessions = [{ id: h.id, scope: 'DIAGNOSTIC_SUMMARY', accepted_at: h.accepted_at, session_expires_at: h.session_expires_at, site_name: 'Demo home' }, ...helperSessions];
+      logHelper('HELPER_ACCEPTED', h.id, 'Demo helper');
+      await wait(0);
+    },
+    getHelperSessions: () => wait(helperSessions.map((h) => ({ ...h }))),
+    getHelperWorkspace: (id) => {
+      if (!helperSessions.some((h) => h.id === id)) return Promise.reject(new Error('Session expired or revoked.'));
+      logHelper('HELPER_SUMMARY_VIEWED', id, 'Demo helper');
+      return wait({ id, siteName: 'Demo home', scope: 'DIAGNOSTIC_SUMMARY' as const, diagnosis: diag(scenario),
+        history: [{ id: 'demo-history', verdict: scenario, summary: SCENARIOS[scenario].headline, created_at: ago(60) }], notes: [...(helperNotes[id] ?? [])] });
+    },
+    addHelperNote: (id, body) => {
+      if (!helperSessions.some((h) => h.id === id)) return Promise.reject(new Error('Session expired or revoked.'));
+      const note = { id: `demo-note-${Date.now()}`, body, created_at: now(), author: 'Demo helper' };
+      helperNotes[id] = [...(helperNotes[id] ?? []), note];
+      logHelper('HELPER_NOTE_ADDED', id, 'Demo helper');
+      return wait([...helperNotes[id]]);
+    },
+    getScamCases: () => wait(scamCases.map(({ id, incident_type, created_at, updated_at }) => ({ id, incident_type, created_at, updated_at }))),
+    startScamCase: (type) => {
+      const stamp = now();
+      const steps = [...DEMO_SCAM_STEPS[type], ['Keep a record', 'Save messages and dates privately outside NetShield.'], ['Report the attempt', 'Report it in the service where it arrived.']]
+        .map(([title, guidance], n) => ({ step_key: `step_${n}`, title, guidance, done: false, completed_at: null }));
+      const c: ScamCase = { id: `demo-case-${Date.now()}`, incident_type: type, created_at: stamp, updated_at: stamp, steps, evidenceLevel: 'USER_REPORTED_ONLY' };
+      scamCases = [c, ...scamCases];
+      return wait({ ...c, steps: [...c.steps] });
+    },
+    getScamCase: (id) => {
+      const c = scamCases.find((item) => item.id === id);
+      return c ? wait({ ...c, steps: [...c.steps] }) : Promise.reject(new Error('Case not found'));
+    },
+    setScamStep: (id, key, done) => {
+      scamCases = scamCases.map((c) => c.id !== id ? c : { ...c, updated_at: now(), steps: c.steps.map((step) => step.step_key === key ? { ...step, done, completed_at: done ? now() : null } : step) });
+      const c = scamCases.find((item) => item.id === id);
+      return c ? wait({ ...c, steps: [...c.steps] }) : Promise.reject(new Error('Case not found'));
+    },
+    deleteScamCase: async (id) => { scamCases = scamCases.filter((c) => c.id !== id); await wait(0); },
     markProtection: async (key, done) => {
       protection = protection.map((p) => (p.key === key ? { ...p, selfReportedDone: done, status: done ? 'SELF_REPORTED' : 'UNVERIFIED' } : p));
       await wait(0);
     },
     saveSettings: async (v) => { settings = v; await wait(0); },
-    deleteData: async () => { devices = []; findings = []; await wait(0); },
+    deleteData: async () => { devices = []; findings = []; scamCases = []; helperInvites = []; helperSessions = []; helperNotes = {}; helperAudit = []; await wait(0); },
   };
   return w;
 }

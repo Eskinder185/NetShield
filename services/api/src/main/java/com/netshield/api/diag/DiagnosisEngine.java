@@ -84,17 +84,23 @@ public final class DiagnosisEngine {
 
         // DNS fails while direct-IP checks still work => DNS is the culprit.
         List<Sample> ipOnly = byKind.getOrDefault("PUBLIC_IP", List.of());
-        if (dns.lossPct() >= DNS_FAIL_PCT && (ipOnly.isEmpty() || stats(ipOnly).lossPct() < PUBLIC_FAIL_PCT)) {
+        if (dns.lossPct() >= DNS_FAIL_PCT && ipOnly.size() >= MIN_SAMPLES && stats(ipOnly).lossPct() < PUBLIC_FAIL_PCT) {
             return new Result(Verdict.DNS_FAILURE, Confidence.HIGH,
                     "Websites are having trouble loading.",
                     String.format("Your router is reachable and the internet itself responds, but %.0f%% of website-name lookups failed. The service that helps your devices find websites isn't answering.", dns.lossPct()),
                     "Restart your router, or switch your router's DNS setting to a different provider, then re-test.", evidence);
         }
 
-        if (allPublicBad && dns.lossPct() < DNS_FAIL_PCT) {
+        if (dns.lossPct() >= DNS_FAIL_PCT && ipOnly.size() < MIN_SAMPLES) {
+            return insufficient(evidence, "Website lookups failed, but the cause is unclear.",
+                    "We need direct internet checks to tell whether this is a website-lookup problem or a wider connection problem.",
+                    "Keep the sensor running with a direct internet target configured, then check again.");
+        }
+
+        if (allPublicBad) {
             return new Result(Verdict.UPSTREAM_ISSUE, Confidence.MEDIUM,
-                    "Your home network is fine, but the internet beyond it isn't responding.",
-                    "Your router answered, but every outside destination we tried failed. This usually means an outage or fault with your internet provider.",
+                    "Your router answered, but outside destinations did not.",
+                    "Your router answered, but every outside destination we tried failed. The issue may be with your modem, provider, or the tested services. More checks are needed to narrow it down.",
                     "Restart the modem, wait two minutes, and re-test. If it persists, contact your provider with the evidence report.", evidence);
         }
         if (!badTargets.isEmpty() && badTargets.size() < pubByTarget.size()) {

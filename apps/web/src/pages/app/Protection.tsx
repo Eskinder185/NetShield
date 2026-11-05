@@ -5,13 +5,27 @@ import { Banner, Button, EmptyState, ErrorState, Loading, Pill } from '../../com
 import { useAsync } from '../../lib/hooks';
 import { useWorkspace } from '../../lib/workspace';
 import { SEVERITY, timeAgo } from '../../lib/plain';
-import type { FindingStatus } from '../../lib/types';
+import type { CoverageState, FindingStatus } from '../../lib/types';
+
+const COVERAGE_STATE: Record<CoverageState, { label: string; tone: 'ok' | 'info' | 'warn' | 'neutral' }> = {
+  PROTECTION_VERIFIED_ACTIVE: { label: 'Protection verified active', tone: 'ok' },
+  MONITORING_AVAILABLE: { label: 'Monitoring available', tone: 'info' },
+  ACTION_REQUIRED: { label: 'Action required', tone: 'warn' },
+  NOT_CONFIGURED: { label: 'Not configured', tone: 'neutral' },
+  UNSUPPORTED: { label: 'Unsupported', tone: 'neutral' },
+  STATUS_UNKNOWN: { label: 'Status unknown', tone: 'neutral' },
+  TEMPORARILY_UNAVAILABLE: { label: 'Temporarily unavailable', tone: 'warn' },
+};
 
 export function Protection() {
   const ws = useWorkspace();
   const findings = useAsync(() => ws.getFindings(), [ws]);
   const prot = useAsync(() => ws.getProtection(), [ws]);
+  const coverage = useAsync(() => ws.getCoverage(), [ws]);
+  const devices = useAsync(() => ws.getDevices(), [ws]);
   const [tab, setTab] = useState<'open' | 'all'>('open');
+  const [selectedLayer, setSelectedLayer] = useState('diagnostics');
+  const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   async function setStatus(id: string, s: FindingStatus) {
@@ -24,6 +38,8 @@ export function Protection() {
   }
 
   const list = (findings.data ?? []).filter((f) => tab === 'all' || f.status !== 'RESOLVED');
+  const layer = coverage.data?.layers.find((item) => item.key === selectedLayer) ?? coverage.data?.layers[0];
+  const device = devices.data?.devices.find((item) => item.id === selectedDevice);
   return (
     <div className="stack">
       <div>
@@ -31,6 +47,40 @@ export function Protection() {
         <p className="muted">Things worth your attention, in order of importance, with the evidence behind each one.</p>
       </div>
       {err && <ErrorState message={err} />}
+
+      <section aria-labelledby="coverage-h" className="stack">
+        <div>
+          <h2 id="coverage-h" style={{ fontSize: '1.4rem' }}>Your coverage map</h2>
+          <p className="muted">See what NetShield can observe, what it cannot see, and what needs setup. Monitoring does not mean protection is active.</p>
+        </div>
+        {coverage.loading ? <Loading label="Assessing coverage" /> : coverage.error ? <ErrorState message={coverage.error} onRetry={coverage.reload} /> : coverage.data && layer && <>
+          <div className="grid grid-3 coverage-grid" aria-label="Protection layers">
+            {coverage.data.layers.map((item) => <button key={item.key} type="button"
+              className="card coverage-choice" aria-pressed={layer.key === item.key} onClick={() => { setSelectedLayer(item.key); setSelectedDevice(null); }}>
+              <strong>{item.title}</strong><Pill tone={COVERAGE_STATE[item.state].tone}>{COVERAGE_STATE[item.state].label}</Pill>
+              <span className="faint">{item.lastObservedAt ? `Last observed ${timeAgo(item.lastObservedAt)}` : 'No observation available'}</span>
+            </button>)}
+          </div>
+          <div className="card stack" aria-live="polite">
+            <div className="row-between"><h3 style={{ margin: 0 }}>{layer.title}</h3><Pill tone={COVERAGE_STATE[layer.state].tone}>{COVERAGE_STATE[layer.state].label}</Pill></div>
+            <p><strong>What we know:</strong> {layer.known}</p>
+            <p><strong>What we cannot see:</strong> {layer.blindSpot}</p>
+            <p><strong>Next step:</strong> {layer.nextStep}</p>
+            <p className="faint">{layer.lastObservedAt ? `Last observed ${new Date(layer.lastObservedAt).toLocaleString()}` : 'No successful observation recorded'} · Assessed {new Date(coverage.data.assessedAt).toLocaleString()}{ws.mode === 'demo' ? ' (synthetic demo)' : ''}.</p>
+            {layer.key === 'devices' && (devices.loading ? <Loading label="Loading devices" /> : devices.error ? <ErrorState message={devices.error} onRetry={devices.reload} /> : devices.data && <>
+              <h4>Observed devices</h4>
+              {!devices.data.consented ? <p className="muted">Device inventory is off. You can enable it in Settings.</p> : devices.data.devices.length === 0 ? <p className="muted">No devices have been observed yet. This does not mean the network is empty.</p> : <>
+                <div className="chips" role="group" aria-label="Observed devices">
+                  {devices.data.devices.map((d) => <button key={d.id} type="button" className="chip" aria-pressed={d.id === selectedDevice} onClick={() => setSelectedDevice(d.id)}>{d.display_name || d.hostname || 'Unnamed device'}</button>)}
+                </div>
+                {device && <div className="card card-flat"><h4>{device.display_name || device.hostname || 'Unnamed device'}</h4>
+                  <p>Marked {device.trust.toLowerCase()} by your household. Last observed {timeAgo(device.last_seen_at)}.</p>
+                  <p className="muted">NetShield cannot verify this device&apos;s firmware, malware status, or all its traffic.</p></div>}
+              </>}
+            </>)}
+          </div>
+        </>}
+      </section>
 
       <section aria-labelledby="f-h" className="stack">
         <div className="row-between">

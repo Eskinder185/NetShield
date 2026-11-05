@@ -1,5 +1,9 @@
 # Privacy model
 
+Phase 2 addition: Scam Rescue stores only a selected incident type and server-authored checklist progress. It does not accept free-text incident notes or credentials. Cases are purged after 30 days and can be deleted sooner; they are included in site JSON export and owner data deletion. The separate pasted-URL checker remains stateless.
+
+Trusted Helper stores a hashed one-time invitation token, owner/helper IDs, scope, acceptance and expiry times, revocation time, and optional helper-written suggestions (up to 1,000 characters). The token is shown only at creation and excluded from exports. The owner can revoke access, and owner site-data deletion removes invitations and notes. Expired invitations and their notes are purged 30 days after access ends. Audit events record creation, acceptance, summary views, suggestions, and revocation; they remain until household deletion. Notes are free text; the UI asks helpers not to include secrets.
+
 Principles: collect the minimum, local-first where possible, consent for anything about other people's devices, easy export and deletion, no third-party calls by default.
 
 | Data | Purpose | Condition | Retention | Notes |

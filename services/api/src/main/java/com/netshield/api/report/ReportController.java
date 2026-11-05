@@ -41,6 +41,10 @@ public class ReportController {
         out.put("incidents", Rows.list(jdbc, "SELECT id, verdict, summary, evidence, window_start, window_end, created_at FROM incidents WHERE site_id=?", siteId));
         out.put("verifications", Rows.list(jdbc, "SELECT v.incident_id, v.outcome, v.before_verdict, v.after_verdict, v.detail, v.created_at FROM verifications v JOIN incidents i ON i.id=v.incident_id WHERE i.site_id=?", siteId));
         out.put("protectionChecks", Rows.list(jdbc, "SELECT check_key, self_reported_done, verified, updated_at FROM protection_checks WHERE site_id=?", siteId));
+        out.put("scamCases", Rows.list(jdbc, "SELECT id,incident_type,created_at,updated_at FROM scam_cases WHERE site_id=?", siteId));
+        out.put("scamSteps", Rows.list(jdbc, "SELECT st.case_id,st.step_key,st.title,st.guidance,st.done,st.completed_at FROM scam_steps st JOIN scam_cases sc ON sc.id=st.case_id WHERE sc.site_id=?", siteId));
+        out.put("helperInvitations", Rows.list(jdbc, "SELECT id,scope,created_at,invite_expires_at,accepted_at,session_expires_at,revoked_at FROM helper_invitations WHERE site_id=?", siteId));
+        out.put("helperNotes", Rows.list(jdbc, "SELECT n.invitation_id,n.body,n.created_at FROM helper_notes n JOIN helper_invitations h ON h.id=n.invitation_id WHERE h.site_id=?", siteId));
         audit.record(ac.householdId(), Current.user(a).email(), "DATA_EXPORTED", siteId.toString());
         return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"netshield-export.json\"").body(out);
     }
@@ -78,7 +82,9 @@ public class ReportController {
         int f = jdbc.update("DELETE FROM findings WHERE site_id=?", siteId);
         int d = jdbc.update("DELETE FROM devices WHERE site_id=?", siteId);
         jdbc.update("DELETE FROM protection_checks WHERE site_id=?", siteId);
+        int scams = jdbc.update("DELETE FROM scam_cases WHERE site_id=?", siteId);
+        int helpers = jdbc.update("DELETE FROM helper_invitations WHERE site_id=?", siteId);
         audit.record(ac.householdId(), Current.user(a).email(), "SITE_DATA_DELETED", "measurements=" + m + " devices=" + d);
-        return Map.of("measurements", m, "incidents", i, "findings", f, "devices", d);
+        return Map.of("measurements", m, "incidents", i, "findings", f, "devices", d, "scamCases", scams, "helperInvitations", helpers);
     }
 }

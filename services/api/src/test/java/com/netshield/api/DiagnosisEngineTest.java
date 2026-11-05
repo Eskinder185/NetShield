@@ -48,6 +48,12 @@ class DiagnosisEngineTest {
         assertEquals("Websites are having trouble loading.", r.headline());
     }
 
+    @Test void dnsFailureNeedsDirectIpEvidence() {
+        var r = run(healthyGateway(), series("DNS", "example.com", i -> false, i -> 0.0),
+                series("PUBLIC_HTTP", "https://example.com", i -> false, i -> 0.0));
+        assertEquals(Verdict.INSUFFICIENT_EVIDENCE, r.verdict());
+    }
+
     @Test void gatewayIssue() {
         var r = run(series("GATEWAY", "router", i -> i % 2 == 0, i -> 3.0), healthyDns(), healthyPublic());
         assertEquals(Verdict.GATEWAY_ISSUE, r.verdict());

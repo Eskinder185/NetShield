@@ -1,5 +1,11 @@
 # Build log
 
+## 2026-11-05 (Phase 2 slices)
+- Internet Doctor retest now excludes saved baseline measurements, requires at least two minutes of fresh readings per check group, and returns before/after evidence; DNS attribution requires direct-IP evidence.
+- Added coverage assessment and selectable map, structured Scam Rescue cases with Flyway V2 and 30-day purge, sampled ISP reliability periods with monitoring gaps and printable report, and Trusted Helper one-time scoped sessions with Flyway V3.
+- Local tests: API 49/49 (H2), agent 9/9 (fixtures only), web 48/48; TypeScript, ESLint, Vite build passed. Chrome audit of four affected demo pages at phone/tablet/desktop, dark/light: 24/24 combinations without axe, overflow, or small-target findings. Visual spot checks reviewed. PostgreSQL/Docker/live sensor not run.
+- Final trust review: coverage now requires recent required probes rather than heartbeat alone; synthetic demo URL examples no longer call the API.
+
 ## 2026-11-04 (session 1)
 - Repo audit, own git repo + branch `feat/netshield-foundation`; docs scaffolded.
 - **API** (`services/api`): auth, sites, sensors, ingest, diagnosis, devices, findings, protection, scam, reports, account, retention. `mvn test` → 37 passed (19 integration, 9 engine, 9 URL). Fixed along the way: test-profile config clobbering main yml; unknown routes returning 500 (now 404/405); URL parser rejecting non-ASCII hosts (homoglyphs) and bad schemes; brand-lookalike detection.

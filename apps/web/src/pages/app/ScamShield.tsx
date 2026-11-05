@@ -1,10 +1,19 @@
-import { useState } from 'react';
+import { useContext, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Search, ShieldAlert, ShieldQuestion } from 'lucide-react';
 import { Banner, Button, Disclosure, Field, Pill, TechDetails } from '../../components/ui';
 import { api, ApiError } from '../../lib/api';
-import type { UrlResult } from '../../lib/types';
+import { useAsync } from '../../lib/hooks';
+import { useWorkspace, WorkspaceContext } from '../../lib/workspace';
+import { ErrorState, Loading } from '../../components/ui';
+import type { ScamCase, ScamIncidentType, UrlResult } from '../../lib/types';
 
 const EXAMPLES = ['https://www.wikipedia.org/wiki/Cat', 'http://paypa1-secure-login.top/verify', 'https://paypal.com@evil.example/login', 'http://192.168.4.20/login'];
+const DEMO_LINK_RESULTS: UrlResult[] = [
+  { level: 'NO_WARNING_SIGNS', headline: 'No obvious text warnings in this example', summary: 'The sample address has a familiar-looking domain. This is not a safety guarantee.', host: 'www.wikipedia.org', signals: [], limits: 'Demo result. No reputation, page content, redirects, or actual site was checked.' },
+  { level: 'SUSPICIOUS', headline: 'This example imitates a familiar brand', summary: 'The domain uses a digit in place of a letter and an unfamiliar ending.', host: 'paypa1-secure-login.top', signals: [{ code: 'DEMO_LOOKALIKE', title: 'Lookalike spelling', detail: 'The “1” can be mistaken for an “l”.', weight: 3 }], limits: 'Synthetic example only. The address was not visited.' },
+  { level: 'SUSPICIOUS', headline: 'The real host is hidden after an @ sign', summary: 'The site name before the @ is not the destination in this example.', host: 'evil.example', signals: [{ code: 'DEMO_AT_SIGN', title: 'Misleading site name', detail: 'The destination is after the @ sign.', weight: 3 }], limits: 'Synthetic example only. The address was not visited.' },
+  { level: 'CAUTION', headline: 'This example uses a local IP address', summary: 'There is no recognizable public site name to confirm.', host: '192.168.4.20', signals: [{ code: 'DEMO_IP_HOST', title: 'IP address', detail: 'The address does not identify an organization.', weight: 2 }], limits: 'Synthetic example only. The address was not visited.' },
+];
 
 const LEVEL = {
   SUSPICIOUS: { tone: 'danger', label: 'Several warning signs', Icon: ShieldAlert },
@@ -14,25 +23,33 @@ const LEVEL = {
 } as const;
 
 export function LinkChecker() {
+  // Also used on the public site, which has no workspace provider.
+  const ws = useContext(WorkspaceContext);
   const [url, setUrl] = useState('');
   const [res, setRes] = useState<UrlResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   async function check(u: string) {
     setBusy(true); setErr(null); setRes(null);
-    try { setRes(await api.inspectUrl(u)); } catch (e) { setErr(e instanceof ApiError ? e.message : 'Something went wrong.'); } finally { setBusy(false); }
+    try {
+      if (ws?.mode === 'demo') {
+        const index = EXAMPLES.indexOf(u);
+        if (index < 0) throw new Error('The demo only shows the four preset sample links. Sign in to check your own link.');
+        setRes(DEMO_LINK_RESULTS[index]);
+      } else setRes(await api.inspectUrl(u));
+    } catch (e) { setErr(e instanceof ApiError || e instanceof Error ? e.message : 'Something went wrong.'); } finally { setBusy(false); }
   }
   const L = res ? LEVEL[res.level] : null;
   return (
     <div className="stack">
       <form onSubmit={(e) => { e.preventDefault(); void check(url); }}>
-        <Field label="Paste a link, or the web address from a QR code" hint="We read the link's text only. We never open it, and we don't store what you paste.">
+        <Field label="Paste a link, or the web address from a QR code" hint={ws?.mode === 'demo' ? 'In the demo, only the preset sample links below are checked, entirely in this browser.' : "We read the link's text only. We never open it, and we don't store what you paste."}>
           {(p) => <input {...p} className="input" type="text" inputMode="url" autoComplete="off" spellCheck={false} maxLength={2048} value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…" />}
         </Field>
         <Button type="submit" icon={Search} busy={busy} disabled={!url.trim()}>Check this link</Button>
       </form>
       <div>
-        <p className="faint" style={{ marginBottom: 6 }}>Not sure? Try an example (these are fake):</p>
+        <p className="faint" style={{ marginBottom: 6 }}>Not sure? Try a sample link:</p>
         <div className="chips">{EXAMPLES.map((e) => <button key={e} type="button" className="chip" style={{ fontSize: '0.85rem' }} onClick={() => { setUrl(e); void check(e); }}>{e.length > 38 ? e.slice(0, 36) + '…' : e}</button>)}</div>
       </div>
       <div aria-live="polite">
@@ -74,13 +91,84 @@ const SCENARIOS = [
   ['Romance or friend in trouble', 'Someone you\'ve only met online asks for money urgently. Pause and talk to someone you trust first.'],
 ];
 
+const RESCUE_CHOICES: { type: ScamIncidentType; label: string }[] = [
+  { type: 'LINK', label: 'I clicked a suspicious link' },
+  { type: 'PASSWORD', label: 'I entered a password' },
+  { type: 'PERSONAL_INFO', label: 'I shared personal information' },
+  { type: 'MONEY', label: 'I sent money' },
+  { type: 'DOWNLOAD', label: 'I downloaded something' },
+  { type: 'IMPERSONATION', label: 'Someone pretended to be a company' },
+  { type: 'DELIVERY', label: 'I got a suspicious delivery message' },
+  { type: 'ACCOUNT_ACCESS', label: 'Someone may have accessed my account' },
+];
+
+function ScamRescue() {
+  const ws = useWorkspace();
+  const cases = useAsync(() => ws.getScamCases(), [ws]);
+  const [active, setActive] = useState<ScamCase | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  async function start(type: ScamIncidentType) {
+    setBusy(true); setErr(null);
+    try { setActive(await ws.startScamCase(type)); cases.reload(); } catch (e) { setErr(e instanceof Error ? e.message : 'Could not start recovery.'); } finally { setBusy(false); }
+  }
+  async function open(id: string) {
+    setBusy(true); setErr(null); setConfirmDelete(false);
+    try { setActive(await ws.getScamCase(id)); } catch (e) { setErr(e instanceof Error ? e.message : 'Could not open recovery.'); } finally { setBusy(false); }
+  }
+  async function mark(key: string, done: boolean) {
+    if (!active) return;
+    setBusy(true); setErr(null);
+    try { setActive(await ws.setScamStep(active.id, key, done)); cases.reload(); } catch (e) { setErr(e instanceof Error ? e.message : 'Could not save this step.'); } finally { setBusy(false); }
+  }
+  async function remove() {
+    if (!active) return;
+    setBusy(true); setErr(null);
+    try { await ws.deleteScamCase(active.id); setActive(null); setConfirmDelete(false); cases.reload(); } catch (e) { setErr(e instanceof Error ? e.message : 'Could not delete this case.'); } finally { setBusy(false); }
+  }
+  const title = (type: ScamIncidentType) => RESCUE_CHOICES.find((choice) => choice.type === type)?.label ?? type;
+  const exportUrl = active && (ws.scamExportUrl?.(active.id) ?? `data:application/json;charset=utf-8,${encodeURIComponent(JSON.stringify({ dataSource: 'DEMO_SYNTHETIC', ...active }, null, 2))}`);
+  return <section className="card stack" aria-labelledby="rescue-h">
+    <div><h2 id="rescue-h" style={{ fontSize: '1.4rem' }}>I think I got scammed</h2>
+      <p className="muted">Take one step at a time. Choose what happened and we&apos;ll make a recovery checklist you can return to.</p></div>
+    <Banner tone="info" title="Keep private details out of NetShield"><p>We only save the type of incident and which steps you mark done. Never enter passwords, recovery codes, card numbers or account details here. A checked step is your report, not technical verification. Cases are removed after 30 days, or you can delete them now.</p></Banner>
+    {err && <ErrorState message={err} />}
+    <div className="chips" role="group" aria-label="What happened">
+      {RESCUE_CHOICES.map((choice) => <button key={choice.type} type="button" className="chip" disabled={busy} onClick={() => void start(choice.type)}>{choice.label}</button>)}
+    </div>
+    {cases.loading ? <Loading label="Loading recovery cases" /> : cases.error ? <ErrorState message={cases.error} onRetry={cases.reload} /> : cases.data && cases.data.length > 0 && <div>
+      <h3>Saved recovery cases</h3>
+      <div className="chips" role="group" aria-label="Saved recovery cases">
+        {cases.data.map((item) => <button key={item.id} type="button" className="chip" aria-pressed={active?.id === item.id} disabled={busy} onClick={() => void open(item.id)}>{title(item.incident_type)} · {new Date(item.created_at).toLocaleDateString()}</button>)}
+      </div>
+    </div>}
+    {busy && <p role="status">Saving recovery progress…</p>}
+    {active && <div className="card card-flat stack">
+      <div><h3>{title(active.incident_type)}</h3><p className="faint">Started {new Date(active.created_at).toLocaleString()} · {active.steps.filter((s) => s.done).length} of {active.steps.length} steps you marked done</p></div>
+      <ol className="stack">{active.steps.map((step) => <li key={step.step_key}>
+        <label className="check"><input type="checkbox" checked={step.done} disabled={busy} onChange={(e) => void mark(step.step_key, e.target.checked)} />
+          <span><strong>{step.title}</strong><br /><span className="muted">{step.guidance}</span>{step.completed_at && <><br /><span className="faint">You marked this done {new Date(step.completed_at).toLocaleString()}</span></>}</span></label>
+      </li>)}</ol>
+      <div className="row">
+        {exportUrl && <a className="btn btn-secondary btn-sm" href={exportUrl} download="netshield-scam-recovery.json">Export summary</a>}
+        {!confirmDelete ? <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(true)}>Delete this case</Button> : <>
+          <Button size="sm" variant="danger" disabled={busy} onClick={() => void remove()}>Confirm delete</Button>
+          <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(false)}>Cancel</Button>
+        </>}
+      </div>
+    </div>}
+  </section>;
+}
+
 export function ScamShield() {
   return (
     <div className="stack">
       <div>
         <h1 className="page-title">Scam Shield</h1>
-        <p className="muted">Not sure about a link or a message? Check it here before you tap.</p>
+        <p className="muted">Get help after a suspected scam, or check a link before you open it.</p>
       </div>
+      <ScamRescue />
       <div className="card"><LinkChecker /></div>
 
       <section aria-labelledby="clicked-h" className="card stack">

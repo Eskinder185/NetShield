@@ -6,7 +6,16 @@ import { useAsync, useAuth, useTheme } from '../../lib/hooks';
 import { useWorkspace } from '../../lib/workspace';
 import { SENSOR_META, VERDICT_META, timeAgo } from '../../lib/plain';
 import { api } from '../../lib/api';
-import type { Diagnosis } from '../../lib/types';
+import type { Diagnosis, ReliabilityStatus } from '../../lib/types';
+
+const RELIABILITY_LABEL: Record<ReliabilityStatus, { label: string; tone: 'ok' | 'warn' | 'info' | 'neutral' }> = {
+  NORMAL_CHECKS_OBSERVED: { label: 'Checks worked', tone: 'ok' },
+  LOCAL_FAILURE_OBSERVED: { label: 'Local checks failed', tone: 'warn' },
+  DNS_FAILURE_OBSERVED: { label: 'Website lookups failed', tone: 'warn' },
+  OUTSIDE_FAILURE_OBSERVED: { label: 'Outside checks failed', tone: 'warn' },
+  PARTIAL_OR_MIXED: { label: 'Mixed or partial results', tone: 'neutral' },
+  MONITORING_GAP: { label: 'No monitoring data', tone: 'info' },
+};
 
 /* ====================== Family ====================== */
 export function Family() {
@@ -79,9 +88,12 @@ export function PrivacyVpn() {
 /* ====================== Reports ====================== */
 export function Reports() {
   const ws = useWorkspace();
+  const [days, setDays] = useState<1 | 7 | 30>(1);
   const hist = useAsync(() => ws.getHistory(), [ws]);
   const diag = useAsync<Diagnosis>(() => ws.getDiagnosis(), [ws]);
   const find = useAsync(() => ws.getFindings(), [ws]);
+  const reliability = useAsync(() => ws.getReliability(days), [ws, days]);
+  const events = reliability.data?.periods.filter((p) => p.status !== 'NORMAL_CHECKS_OBSERVED') ?? [];
   return (
     <div className="stack">
       <div className="row-between no-print"><div><h1 className="page-title">Reports</h1><p className="muted">A summary of what happened, what was fixed and what still needs attention.</p></div>
@@ -100,6 +112,33 @@ export function Reports() {
         {find.loading ? <Loading /> : find.data?.length ? <ul>{find.data.map((f) => <li key={f.id}>{f.title}: {f.status === 'RESOLVED' ? 'closed' : f.status === 'ACKNOWLEDGED' ? 'reviewed' : 'open'}</li>)}</ul> : <p className="muted">No alerts.</p>}
         <p className="faint">Limits: measurements describe only the times your sensor was running and the targets it was told to check. A report is evidence for a conversation with your provider, not a guarantee.</p>
       </article>
+      <section className="card stack" aria-labelledby="reliability-h">
+        <div className="row-between"><div><h2 id="reliability-h" style={{ fontSize: '1.4rem' }}>Internet reliability evidence</h2>
+          <p className="muted">A dated summary you can print or save as PDF for a support conversation.</p></div>
+          {ws.mode === 'demo' && <Pill tone="demo">Synthetic example</Pill>}</div>
+        <div className="chips no-print" role="group" aria-label="Report period">
+          {([1, 7, 30] as const).map((n) => <button key={n} type="button" className="chip" aria-pressed={days === n} onClick={() => setDays(n)}>{n === 1 ? 'Day' : n === 7 ? 'Week' : 'Month'}</button>)}
+        </div>
+        {reliability.loading ? <Loading label="Gathering reliability evidence" /> : reliability.error ? <ErrorState message={reliability.error} onRetry={reliability.reload} /> : reliability.data && <>
+          <p><strong>Period requested:</strong> {new Date(reliability.data.requestedStart).toLocaleString()} to {new Date(reliability.data.requestedEnd).toLocaleString()}.</p>
+          {reliability.data.sampleCount === 0 ? <Banner tone="info" title="No measurements for this period"><p>We cannot say whether the connection worked. Connect the home sensor to start collecting evidence.</p></Banner> : <>
+            <p><strong>{reliability.data.sampleCount} checks</strong> received. First observed {new Date(reliability.data.observedStart!).toLocaleString()}; last observed {new Date(reliability.data.observedEnd!).toLocaleString()}. Times outside those observations are unknown.</p>
+            {reliability.data.truncated && <Banner tone="warn" title="Partial report"><p>Only the most recent 50,000 measurements are included. Older measurements in the selected period were omitted.</p></Banner>}
+            <h3>Measured events and gaps</h3>
+            {events.length === 0 ? <p className="muted">No classified failures or gaps between observed periods. This does not prove continuous service.</p> : <ol className="stack">
+              {events.slice(-100).map((period, i) => <li key={`${period.start}-${i}`} className="card card-flat">
+                <div className="row-between"><strong>{new Date(period.start).toLocaleString()} to {new Date(period.end).toLocaleString()}</strong><Pill tone={RELIABILITY_LABEL[period.status].tone}>{RELIABILITY_LABEL[period.status].label}</Pill></div>
+                <p className="muted">{period.explanation} {period.sampleCount > 0 && `${period.sampleCount} checks in this group.`}</p>
+              </li>)}
+            </ol>}
+            {events.length > 100 && <p className="faint">Showing the latest 100 of {events.length} classified events. Choose a shorter period for more detail.</p>}
+            <h3>Message for your provider</h3>
+            <p>“Hello, I have been experiencing connection problems. NetShield recorded {events.filter((p) => p.status.includes('FAILURE')).length} five-minute groups with failed checks during the period above. Could you review the line and modem logs for these times? I understand these checks do not establish where the fault occurred.”</p>
+          </>}
+          <h3>Method and limits</h3>
+          <p className="faint">{reliability.data.methodology} {ws.mode === 'demo' ? 'All values on this page are synthetic.' : 'These are stored sensor measurements, not an independent ISP test.'}</p>
+        </>}
+      </section>
       <section className="card stack no-print" aria-labelledby="dl-h">
         <h2 id="dl-h" style={{ fontSize: '1.3rem' }}>Download your data</h2>
         {ws.mode === 'demo' ? <Banner tone="demo"><p>Downloads are turned off in the demo because there&apos;s no real data to export.</p></Banner> : (

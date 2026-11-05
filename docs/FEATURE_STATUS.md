@@ -1,5 +1,9 @@
 # Feature status
 
+## Phase 2 update (2026-11-05)
+
+The phase 2 audit and accurate current classifications are in `docs/ai/FEATURE-STATUS.md`. Internet Doctor now requires post-baseline measurements for a verified retest and shows before/after evidence. Coverage maps eleven explicit states. Scam Rescue has structured, stored recovery cases with 30-day retention. Reports show sampled reliability periods and monitoring gaps with browser PDF saving. Trusted Helper has scoped one-time, read-only sessions with revocation. Local API and web tests passed; PostgreSQL, Docker, and live-sensor QA remain outstanding.
+
 Legend: **Working/Tested** (implemented, automated tests pass) · **Working** (implemented, manually exercised only) · **Demo** (synthetic data only) · **Gated** (needs setup you must do) · **Planned** · **Blocked**.
 IDs refer to the 161-feature catalog in `NetShield_Claude_Code_Autonomous_Build_Prompt.md`.
 

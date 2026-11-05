@@ -12,6 +12,7 @@ import { InternetDoctor } from './pages/app/InternetDoctor';
 import { Devices } from './pages/app/Devices';
 import { Protection } from './pages/app/Protection';
 import { ScamShield } from './pages/app/ScamShield';
+import { TrustedHelpers } from './pages/app/TrustedHelpers';
 import { Assistant, Family, Lab, PrivacyVpn, Reports, SettingsPage } from './pages/app/More';
 import { Login, Register } from './pages/app/Auth';
 import { Onboarding } from './pages/app/Onboarding';
@@ -39,6 +40,7 @@ function AppRoutes() {
       <Route path="devices" element={<Devices />} />
       <Route path="protection" element={<Protection />} />
       <Route path="scam-shield" element={<ScamShield />} />
+      <Route path="helpers" element={<TrustedHelpers />} />
       <Route path="family" element={<Family />} />
       <Route path="privacy" element={<PrivacyVpn />} />
       <Route path="reports" element={<Reports />} />

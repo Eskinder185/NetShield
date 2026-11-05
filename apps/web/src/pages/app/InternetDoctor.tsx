@@ -35,7 +35,7 @@ export function InternetDoctor() {
   }
   async function startFix() {
     setBusy(true); setErr(null);
-    try { const d = await ws.recordDiagnosis(); setIncident(d.incidentId ?? null); setFixing(true); } catch (e) { setErr(e instanceof Error ? e.message : 'Failed'); } finally { setBusy(false); }
+    try { const d = await ws.recordDiagnosis(); setDiag(d); setIncident(d.incidentId ?? null); setFixing(true); } catch (e) { setErr(e instanceof Error ? e.message : 'Failed'); } finally { setBusy(false); }
   }
   async function doRetest() {
     if (!incident) return;
@@ -98,8 +98,8 @@ export function InternetDoctor() {
               <h3>Try this, then check again</h3>
               <ol>
                 <li>{diag.action}</li>
-                <li>Give it about two minutes.</li>
-                <li>Press &ldquo;Check if it worked&rdquo;. We&apos;ll take fresh measurements and compare them with what we saw before.</li>
+                <li>Keep the sensor running until it has taken at least five new checks of your router, website lookups and the wider internet. At the default interval, this takes about five minutes.</li>
+                <li>Press &ldquo;Check if it worked&rdquo;. We&apos;ll compare only measurements taken after the saved check. If there are too few, we&apos;ll say so.</li>
               </ol>
               <Button icon={RefreshCcw} onClick={doRetest} busy={busy}>Check if it worked</Button>
             </div>
@@ -160,10 +160,21 @@ function RetestCard({ r, mode }: { r: Retest; mode: string }) {
   const ok = r.outcome === 'VERIFIED';
   const inc = r.outcome === 'INCONCLUSIVE';
   const Icon = ok ? CheckCircle2 : inc ? HelpCircle : XCircle;
+  const kinds = Array.from(new Set([...Object.keys(r.beforeEvidence ?? {}), ...Object.keys(r.after.evidence)]));
   return (
-    <Banner tone={ok ? 'ok' : inc ? 'info' : 'warn'} title={ok ? 'Confirmed: it looks fixed' : inc ? "We can't tell yet" : "It doesn't look fixed yet"} role="status">
+    <Banner tone={ok ? 'ok' : inc ? 'info' : 'warn'} title={ok ? r.beforeVerdict === 'HEALTHY' ? 'Recent checks remain normal' : 'Recent checks show improvement' : inc ? "We can't tell yet" : "It doesn't look improved yet"} role="status">
       <p><Icon size={16} aria-hidden="true" style={{ verticalAlign: '-3px' }} /> {r.detail}</p>
       <p className="faint">Before: {VERDICT_META[r.beforeVerdict].label} → Now: {VERDICT_META[r.afterVerdict].label}.{mode === 'demo' && ' (Scripted demo result.)'}</p>
+      <p className="faint">Checked {new Date(r.verifiedAt ?? r.after.windowEnd).toLocaleString()}. {r.after.sampleCount} new measurements. {inc ? 'More readings are needed before we can verify a change.' : 'This comparison describes only the sampled periods.'}</p>
+      {kinds.length > 0 && <div className="table-wrap" tabIndex={0} role="region" aria-label="Before and after measurements (scrolls sideways on small screens)">
+        <table>
+          <thead><tr><th>Checked</th><th>Before failed</th><th>After failed</th><th>Before delay</th><th>After delay</th></tr></thead>
+          <tbody>{kinds.map((k) => <tr key={k}><td>{KIND_LABEL[k] ?? k}</td>
+            <td>{r.beforeEvidence?.[k] ? `${r.beforeEvidence[k].lossPct.toFixed(0)}% (${r.beforeEvidence[k].count})` : 'No data'}</td>
+            <td>{r.after.evidence[k] ? `${r.after.evidence[k].lossPct.toFixed(0)}% (${r.after.evidence[k].count})` : 'No data'}</td>
+            <td>{fmtMs(r.beforeEvidence?.[k]?.medianMs)}</td><td>{fmtMs(r.after.evidence[k]?.medianMs)}</td></tr>)}</tbody>
+        </table>
+      </div>}
     </Banner>
   );
 }
