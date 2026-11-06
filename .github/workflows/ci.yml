@@ -41,7 +41,7 @@ jobs:
         with: { fetch-depth: 0 }
       # Scan the full history, avoiding the action's invalid first-commit range.
       # A full history scan also catches secrets removed in later commits.
-      - run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.24.3 git --source=/repo --log-opts="--all" --redact
+      - run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.24.3 git /repo --log-opts="--all" --redact
   docker-smoke:
     runs-on: ubuntu-latest
     needs: [api, web]
